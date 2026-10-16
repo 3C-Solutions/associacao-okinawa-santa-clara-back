@@ -10,7 +10,7 @@ public record ErrorResponseDTO(
         @Schema(description = "Status HTTP do erro", example = "404")
         Integer status,
 
-        @Schema(description = "Mensagem que descreve o erro", example = "Associado não encontrado")
+        @Schema(description = "Mensagem que descreve o erro", example = "Usuário não encontrado")
         String mensagem,
 
         @Schema(description = "Data e horário em que o erro ocorreu", example = "01/10/2026 " +
