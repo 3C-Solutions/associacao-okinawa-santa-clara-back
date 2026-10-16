@@ -1,10 +1,10 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.associado.AssociadoCreateRequestDTO;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.associado.AssociadoResponseDTO;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.associado.AssociadoUpdateRequestDTO;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.UsuarioCreateRequest;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.UsuarioResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.UsuarioUpdateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.error.ErrorResponseDTO;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AssociadoService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -21,27 +21,27 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/associados")
+@RequestMapping("/usuarios")
 @Tag(
-        name = "Associados",
-        description = "Endpoints responsáveis pelo gerenciamento dos associados"
+        name = "Usuários",
+        description = "Endpoints responsáveis pelo gerenciamento dos usuários"
 )
-public class AssociadoController {
-    private final AssociadoService associadoService;
+public class UsuarioController {
+    private final UsuarioService usuarioService;
 
-    public AssociadoController(AssociadoService associadoService) {
-        this.associadoService = associadoService;
+    public UsuarioController(UsuarioService associadoService) {
+        this.usuarioService = associadoService;
     }
 
     @Operation(
-            summary = "Listagem dos associados",
-            description = "Lista todos os associados cadastrados no sistema"
+            summary = "Listagem dos usuários",
+            description = "Lista todos os usuários cadastrados no sistema"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Associados listados com sucesso"),
+            @ApiResponse(responseCode = "200", description = "Usuários listados com sucesso"),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Rota incorreta para realizar a listagem dos associados",
+                    description = "Rota incorreta para realizar a listagem dos usuários",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -49,7 +49,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 404,
-                                             "message": "Erro ao buscar associados",
+                                             "message": "Erro ao buscar usuários",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -58,28 +58,28 @@ public class AssociadoController {
             )
     })
     @GetMapping
-    public ResponseEntity<List<AssociadoResponseDTO>> listar() {
-        return ResponseEntity.status(HttpStatus.OK).body(associadoService.listar());
+    public ResponseEntity<List<UsuarioResponse>> listar() {
+        return ResponseEntity.status(HttpStatus.OK).body(usuarioService.listar());
     }
 
     @Operation(
-            summary = "Busca por um associado específico",
-            description = "Busca um associado pelo identificador único"
+            summary = "Busca por um usuário específico",
+            description = "Busca um usuário pelo identificador único"
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Associado encontrado com sucesso",
+                    description = "Usuário encontrado com sucesso",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
-                                    implementation = AssociadoResponseDTO.class
+                                    implementation = UsuarioResponse.class
                             )
                     )
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Associado não existe no sistema",
+                    description = "Usuário não existe no sistema",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
@@ -89,34 +89,34 @@ public class AssociadoController {
             )
     })
     @GetMapping("/{id}")
-    public ResponseEntity<AssociadoResponseDTO> buscarPorId(
+    public ResponseEntity<UsuarioResponse> buscarPorId(
             @Parameter(
-                    description = "Identificador único do associado",
+                    description = "Identificador único do usuário",
                     example = "7"
             )
-            @PathVariable Integer id
+            @PathVariable("id") Integer id
     ) {
-        return ResponseEntity.status(HttpStatus.OK).body(associadoService.buscarPorId(id));
+        return ResponseEntity.status(HttpStatus.OK).body(usuarioService.buscarPorId(id));
     }
 
     @Operation(
-            summary = "Cadastro de associados",
-            description = "Realiza o cadastro de um novo associado no sistema"
+            summary = "Cadastro de usuários",
+            description = "Realiza o cadastro de um novo usuário no sistema"
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
-                    description = "Associado cadastrado com sucesso",
+                    description = "Usuário cadastrado com sucesso",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
-                                    implementation = AssociadoResponseDTO.class
+                                    implementation = UsuarioResponse.class
                             )
                     )
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Dados para cadastro do associado enviados incorretamente",
+                    description = "Dados para cadastro do usuário enviados incorretamente",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -124,7 +124,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 400,
-                                             "message": "Dados para cadastro do associado enviados incorretamente",
+                                             "message": "Dados para cadastro do usuário enviados incorretamente",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -133,7 +133,7 @@ public class AssociadoController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Já existe um associado cadastrado com o e-mail informado",
+                    description = "Já existe um usuário cadastrado com o e-mail informado",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -141,7 +141,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 409,
-                                             "message": "Já existe um associado cadastrado com o e-mail informado",
+                                             "message": "Já existe um usuário cadastrado com o e-mail informado",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -150,28 +150,28 @@ public class AssociadoController {
             )
     })
     @PostMapping
-    public ResponseEntity<AssociadoResponseDTO> cadastrar(@Valid @RequestBody AssociadoCreateRequestDTO request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(associadoService.cadastrar(request));
+    public ResponseEntity<UsuarioResponse> cadastrar(@Valid @RequestBody UsuarioCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(usuarioService.cadastrar(request));
     }
 
     @Operation(
-            summary = "Atualização de um associado",
-            description = "Atualiza um associado específico, identificado pelo identificador único"
+            summary = "Atualização de um usuário",
+            description = "Atualiza um usuário específico, identificado pelo identificador único"
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "200",
-                    description = "Associado atualizado com sucesso.",
+                    description = "Usuário atualizado com sucesso.",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(
-                                    implementation = AssociadoResponseDTO.class
+                                    implementation = UsuarioResponse.class
                             )
                     )
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Dados para atualização do associado enviados incorretamente",
+                    description = "Dados para atualização do usuário enviados incorretamente",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -179,7 +179,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 400,
-                                             "message": "Dados para atualização do associado enviados incorretamente",
+                                             "message": "Dados para atualização do usuário enviados incorretamente",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -188,7 +188,7 @@ public class AssociadoController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Associado não existe no sistema",
+                    description = "Usuário não existe no sistema",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -196,7 +196,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 404,
-                                             "message": "Associado não existe no sistema",
+                                             "message": "Usuário não existe no sistema",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -205,7 +205,7 @@ public class AssociadoController {
             ),
             @ApiResponse(
                     responseCode = "409",
-                    description = "Já existe um associado cadastrado com o e-mail informado",
+                    description = "Já existe um usuário cadastrado com o e-mail informado",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponseDTO.class),
@@ -213,7 +213,7 @@ public class AssociadoController {
                                     value = """
                                              {
                                              "status": 409,
-                                             "message": "Já existe um associado cadastrado com o e-mail informado",
+                                             "message": "Já existe um usuário cadastrado com o e-mail informado",
                                              "timestamp": "01/10/2026 10:00:00"\s
                                              }
                                             \s"""
@@ -222,28 +222,45 @@ public class AssociadoController {
             )
     })
     @PutMapping("/{id}")
-    public ResponseEntity<AssociadoResponseDTO> editar(
-            @Valid @RequestBody AssociadoUpdateRequestDTO dto,
+    public ResponseEntity<UsuarioResponse> editar(
+            @Valid @RequestBody UsuarioUpdateRequest dto,
             @Parameter(
                     description = "Identificador único do associado",
                     example = "7"
             )
             @PathVariable Integer id
     ) {
-        return ResponseEntity.status(HttpStatus.OK).body(associadoService.atualizar(dto, id));
+        return ResponseEntity.status(HttpStatus.OK).body(usuarioService.atualizar(id, dto));
     }
 
     @Operation(
-            summary = "Exclusão de um associado",
-            description = "Exclui um associado do sistema pelo identificador único"
+            summary = "Exclusão de um usuário",
+            description = "Exclui um usuário do sistema pelo identificador único"
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Associado excluído com sucesso"),
-            @ApiResponse(responseCode = "404", description = "Associado não existe no sistema")
+            @ApiResponse(responseCode = "204", description = "Usuário excluído com sucesso"),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Usuário não existe no sistema",
+                    content =
+                    @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponseDTO.class),
+                            examples = @ExampleObject(
+                                    value = """
+                                             {
+                                             "status": 404,
+                                             "message": "Usuário não existe no sistema",
+                                             "timestamp": "01/10/2026 10:00:00"\s
+                                             }
+                                            \s"""
+                            )
+                    ))
     })
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        associadoService.excluir(id);
+        usuarioService.excluir(id);
 
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
