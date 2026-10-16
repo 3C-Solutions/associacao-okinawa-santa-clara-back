@@ -6,6 +6,8 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Endere
 public class EnderecoMapper {
 
     public static EnderecoResponse toResponse(Endereco endereco) {
+        if (endereco == null) return null;
+
         EnderecoResponse dto = new EnderecoResponse();
         dto.setId(endereco.getId());
         dto.setRua(endereco.getRua());

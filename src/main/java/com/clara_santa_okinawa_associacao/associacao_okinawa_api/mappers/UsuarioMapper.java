@@ -25,10 +25,14 @@ public class UsuarioMapper {
     }
 
     public static List<UsuarioResponse> toResponse(List<Usuario> associados) {
+        if (associados == null || associados.isEmpty()) return null;
+
         return associados.stream().map(UsuarioMapper::toResponse).toList();
     }
 
     public static Usuario toEntity(UsuarioCreateRequest dto) {
+        if (dto == null) return null;
+
         Usuario usuario = new Usuario();
         usuario.setNome(dto.getNome());
         usuario.setEmail(dto.getEmail());
@@ -39,6 +43,8 @@ public class UsuarioMapper {
     }
 
     public static void updateEntity(UsuarioUpdateRequest dto, Usuario usuario) {
+        if (dto == null || usuario == null) return;
+
         usuario.setNome(dto.getNome());
         usuario.setTelefone(dto.getTelefone());
         usuario.setFamilia(usuario.getFamilia());
