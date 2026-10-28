@@ -12,6 +12,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.Usuario
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -27,13 +28,16 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final FamiliaRepository familiaRepository;
     private final FuncaoSistemaRepository funcaoSistemaRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           FamiliaRepository familiaRepository,
-                          FuncaoSistemaRepository funcaoSistemaRepository) {
+                          FuncaoSistemaRepository funcaoSistemaRepository,
+                          PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
         this.familiaRepository = familiaRepository;
         this.funcaoSistemaRepository = funcaoSistemaRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<UsuarioResponse> listar() {
@@ -72,7 +76,7 @@ public class UsuarioService {
 
         Usuario novoUsuario = UsuarioMapper.toEntity(request);
         novoUsuario.setFamilia(familia);
-        novoUsuario.setSenha(gerarSenha());
+        novoUsuario.setSenha(passwordEncoder.encode(gerarSenha()));
         novoUsuario.setFuncaoSistema(funcaoSistema);
         novoUsuario.setDataCriacao(LocalDateTime.now());
 
