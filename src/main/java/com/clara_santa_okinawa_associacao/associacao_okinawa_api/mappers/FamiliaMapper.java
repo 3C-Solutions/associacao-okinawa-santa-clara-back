@@ -8,11 +8,10 @@ public class FamiliaMapper {
     public static FamiliaResponse toResponse(Familia familia) {
         if (familia == null) return null;
 
-        FamiliaResponse dto = new FamiliaResponse();
-        dto.setId(familia.getId());
-        dto.setNome(familia.getNome());
-        dto.setEndereco(EnderecoMapper.toResponse(familia.getEndereco()));
-
-        return dto;
+        return new FamiliaResponse(
+                familia.getId(),
+                familia.getNome(),
+                EnderecoMapper.toResponse(familia.getEndereco())
+        );
     }
 }

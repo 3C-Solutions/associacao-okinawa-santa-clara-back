@@ -11,17 +11,17 @@ public class UsuarioMapper {
     public static UsuarioResponse toResponse(Usuario usuario) {
         if (usuario == null) return null;
 
-        UsuarioResponse dto = new UsuarioResponse();
-        dto.setId(usuario.getId());
-        dto.setFamilia(FamiliaMapper.toResponse(usuario.getFamilia()));
-        dto.setNome(usuario.getNome());
-        dto.setDataNascimento(usuario.getDataNascimento());
-        dto.setEmail(usuario.getEmail());
-        dto.setAtivo(usuario.isAtivo());
-        dto.setDataCriacao(usuario.getDataCriacao());
-        dto.setTelefone(usuario.getTelefone());
-        dto.setFuncaoSistema(FuncaoSistemaMapper.toResponse(usuario.getFuncaoSistema()));
-        return dto;
+        return new UsuarioResponse(
+                usuario.getId(),
+                usuario.getNome(),
+                usuario.getEmail(),
+                usuario.getTelefone(),
+                usuario.getDataNascimento(),
+                usuario.isAtivo(),
+                FuncaoSistemaMapper.toResponse(usuario.getFuncaoSistema()),
+                usuario.getDataCriacao(),
+                FamiliaMapper.toResponse(usuario.getFamilia())
+        );
     }
 
     public static List<UsuarioResponse> toResponse(List<Usuario> associados) {
@@ -34,10 +34,10 @@ public class UsuarioMapper {
         if (dto == null) return null;
 
         Usuario usuario = new Usuario();
-        usuario.setNome(dto.getNome());
-        usuario.setEmail(dto.getEmail());
-        usuario.setDataNascimento(dto.getDataNascimento());
-        usuario.setTelefone(dto.getTelefone());
+        usuario.setNome(dto.nome());
+        usuario.setEmail(dto.email());
+        usuario.setDataNascimento(dto.dataNascimento());
+        usuario.setTelefone(dto.telefone());
         usuario.setAtivo(true);
         return usuario;
     }
@@ -45,9 +45,9 @@ public class UsuarioMapper {
     public static void updateEntity(UsuarioUpdateRequest dto, Usuario usuario) {
         if (dto == null || usuario == null) return;
 
-        usuario.setNome(dto.getNome());
-        usuario.setTelefone(dto.getTelefone());
+        usuario.setNome(dto.nome());
+        usuario.setTelefone(dto.telefone());
         usuario.setFamilia(usuario.getFamilia());
-        usuario.setAtivo(dto.isAtivo());
+        usuario.setAtivo(dto.ativo());
     }
 }

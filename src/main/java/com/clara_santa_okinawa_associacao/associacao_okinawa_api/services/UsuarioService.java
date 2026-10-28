@@ -55,19 +55,19 @@ public class UsuarioService {
     }
 
     public UsuarioResponse cadastrar(UsuarioCreateRequest request) {
-        String emailNormalizado = normalizarEmail(request.getEmail());
+        String emailNormalizado = normalizarEmail(request.email());
 
         if (usuarioRepository.existsByEmail(emailNormalizado)) {
             throw new AlreadyExistsByEmailException("Já existe um usuário com este e-mail " +
                     "cadastrado no sistema! " + emailNormalizado);
         }
 
-        Integer idFamiliaDesejada = request.getIdFamilia();
+        Integer idFamiliaDesejada = request.idFamilia();
 
         Familia familia =
                 familiaRepository.findById(idFamiliaDesejada).orElseThrow(() -> new NotExistsByIdException("Familia não encontrada " + idFamiliaDesejada));
 
-        Integer idFuncaoSistemaDesejada = request.getIdFuncaoSistema();
+        Integer idFuncaoSistemaDesejada = request.idFuncaoSistema();
 
         FuncaoSistema funcaoSistema =
                 funcaoSistemaRepository.findById(idFuncaoSistemaDesejada).orElseThrow(() -> new NotExistsByIdException(
@@ -89,7 +89,7 @@ public class UsuarioService {
                 usuarioRepository.findById(id).orElseThrow(() -> new NotExistsByIdException(
                         "Usuário não encontrado! " + id));
 
-        Integer idFuncaoSistema = request.getIdFuncaoSistema();
+        Integer idFuncaoSistema = request.idFuncaoSistema();
 
         FuncaoSistema funcaoSistema =
                 funcaoSistemaRepository.findById(idFuncaoSistema).orElseThrow(() -> new NotExistsByIdException(

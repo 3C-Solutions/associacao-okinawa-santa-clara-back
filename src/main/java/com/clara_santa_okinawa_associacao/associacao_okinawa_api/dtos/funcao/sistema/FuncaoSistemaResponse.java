@@ -10,39 +10,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 })
 
 @Schema(description = "Dados que representam a resposta de uma requisição")
-public class FuncaoSistemaResponse {
+public record FuncaoSistemaResponse(
+        @Schema(description = "Identificador único de uma função do sistema", example = "2")
+        Integer id,
 
-    @Schema(description = "Identificador único de uma função do sistema", example = "2")
-    private Integer id;
+        @Schema(description = "Nome da função", example = "Diretoria")
+        String nome,
 
-    @Schema(description = "Nome da função", example = "Diretoria")
-    private String nome;
-
-    @Schema(description = "Descrição da função", example = "Função responsável por toda a parte " +
-            "administrativa do sistema")
-    private String descricao;
-
-    public Integer getId() {
-        return id;
-    }
-
-    public void setId(Integer id) {
-        this.id = id;
-    }
-
-    public String getNome() {
-        return nome;
-    }
-
-    public void setNome(String nome) {
-        this.nome = nome;
-    }
-
-    public String getDescricao() {
-        return descricao;
-    }
-
-    public void setDescricao(String descricao) {
-        this.descricao = descricao;
-    }
+        @Schema(description = "Descrição da função", example = "Função responsável por toda a parte " +
+                "administrativa do sistema")
+        String descricao
+) {
 }
