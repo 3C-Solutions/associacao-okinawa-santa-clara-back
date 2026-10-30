@@ -12,6 +12,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.Usuario
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -27,13 +28,16 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final FamiliaRepository familiaRepository;
     private final FuncaoSistemaRepository funcaoSistemaRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           FamiliaRepository familiaRepository,
-                          FuncaoSistemaRepository funcaoSistemaRepository) {
+                          FuncaoSistemaRepository funcaoSistemaRepository,
+                          PasswordEncoder passwordEncoder) {
         this.usuarioRepository = usuarioRepository;
         this.familiaRepository = familiaRepository;
         this.funcaoSistemaRepository = funcaoSistemaRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public List<UsuarioResponse> listar() {
@@ -51,19 +55,19 @@ public class UsuarioService {
     }
 
     public UsuarioResponse cadastrar(UsuarioCreateRequest request) {
-        String emailNormalizado = normalizarEmail(request.getEmail());
+        String emailNormalizado = normalizarEmail(request.email());
 
         if (usuarioRepository.existsByEmail(emailNormalizado)) {
             throw new AlreadyExistsByEmailException("Já existe um usuário com este e-mail " +
                     "cadastrado no sistema! " + emailNormalizado);
         }
 
-        Integer idFamiliaDesejada = request.getIdFamilia();
+        Integer idFamiliaDesejada = request.idFamilia();
 
         Familia familia =
                 familiaRepository.findById(idFamiliaDesejada).orElseThrow(() -> new NotExistsByIdException("Familia não encontrada " + idFamiliaDesejada));
 
-        Integer idFuncaoSistemaDesejada = request.getIdFuncaoSistema();
+        Integer idFuncaoSistemaDesejada = request.idFuncaoSistema();
 
         FuncaoSistema funcaoSistema =
                 funcaoSistemaRepository.findById(idFuncaoSistemaDesejada).orElseThrow(() -> new NotExistsByIdException(
@@ -72,7 +76,7 @@ public class UsuarioService {
 
         Usuario novoUsuario = UsuarioMapper.toEntity(request);
         novoUsuario.setFamilia(familia);
-        novoUsuario.setSenha(gerarSenha());
+        novoUsuario.setSenha(passwordEncoder.encode(gerarSenha()));
         novoUsuario.setFuncaoSistema(funcaoSistema);
         novoUsuario.setDataCriacao(LocalDateTime.now());
 
@@ -85,7 +89,7 @@ public class UsuarioService {
                 usuarioRepository.findById(id).orElseThrow(() -> new NotExistsByIdException(
                         "Usuário não encontrado! " + id));
 
-        Integer idFuncaoSistema = request.getIdFuncaoSistema();
+        Integer idFuncaoSistema = request.idFuncaoSistema();
 
         FuncaoSistema funcaoSistema =
                 funcaoSistemaRepository.findById(idFuncaoSistema).orElseThrow(() -> new NotExistsByIdException(

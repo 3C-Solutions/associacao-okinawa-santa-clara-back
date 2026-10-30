@@ -1,9 +1,9 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
+
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 public class FuncaoSistema {
@@ -13,6 +13,20 @@ public class FuncaoSistema {
     private Integer id;
     private String nome;
     private String descricao;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "funcionalidade_sistema_funcao_sistema",
+
+            joinColumns = @JoinColumn(
+                    name = "fk_funcao_sistema"
+            ),
+
+            inverseJoinColumns = @JoinColumn(
+                    name = "fk_funcionalidade_sistema"
+            )
+    )
+    private Set<FuncionalidadeSistema> funcionalidades = new HashSet<>();
 
     public Integer getId() {
         return id;
@@ -36,5 +50,13 @@ public class FuncaoSistema {
 
     public void setDescricao(String descricao) {
         this.descricao = descricao;
+    }
+
+    public Set<FuncionalidadeSistema> getFuncionalidades() {
+        return funcionalidades;
+    }
+
+    public void setFuncionalidades(Set<FuncionalidadeSistema> funcionalidades) {
+        this.funcionalidades = funcionalidades;
     }
 }

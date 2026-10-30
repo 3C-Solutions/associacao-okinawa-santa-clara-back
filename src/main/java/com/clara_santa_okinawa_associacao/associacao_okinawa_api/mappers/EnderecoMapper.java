@@ -8,16 +8,15 @@ public class EnderecoMapper {
     public static EnderecoResponse toResponse(Endereco endereco) {
         if (endereco == null) return null;
 
-        EnderecoResponse dto = new EnderecoResponse();
-        dto.setId(endereco.getId());
-        dto.setRua(endereco.getRua());
-        dto.setBairro(endereco.getBairro());
-        dto.setCep(endereco.getCep());
-        dto.setCidade(endereco.getCidade());
-        dto.setComplemento(endereco.getComplemento());
-        dto.setUf(endereco.getUf());
-        dto.setNumero(endereco.getNumero());
-
-        return dto;
+        return new EnderecoResponse(
+                endereco.getId(),
+                endereco.getRua(),
+                endereco.getBairro(),
+                endereco.getCidade(),
+                endereco.getNumero(),
+                endereco.getUf(),
+                endereco.getCep(),
+                endereco.getComplemento()
+        );
     }
 }
