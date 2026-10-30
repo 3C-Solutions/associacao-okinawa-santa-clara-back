@@ -3,6 +3,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.error.ErrorResponseDTO;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -10,6 +11,17 @@ import java.time.LocalDateTime;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler extends RuntimeException {
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleFalhaAutenticacao(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                new ErrorResponseDTO(
+                        401,
+                        "E-mail ou senha inválidos ou usuário desativado",
+                        LocalDateTime.now()
+                )
+        );
+    }
+
     @ExceptionHandler(AlreadyExistsByEmailException.class)
     public ResponseEntity<ErrorResponseDTO> handleEmailJaCadastrado(AlreadyExistsByEmailException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(

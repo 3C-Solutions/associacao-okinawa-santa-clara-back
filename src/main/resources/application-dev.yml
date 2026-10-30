@@ -1,0 +1,5 @@
+app:
+  bootstrap:
+    enabled: ${APP_BOOTSTRAP_ENABLED:false}
+    email: ${APP_BOOTSTRAP_EMAIL:}
+    password: ${APP_BOOTSTRAP_PASSWORD:}

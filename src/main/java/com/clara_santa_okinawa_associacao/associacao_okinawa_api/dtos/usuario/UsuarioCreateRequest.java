@@ -24,7 +24,7 @@ public record UsuarioCreateRequest(
         @Schema(description = "E-mail do associado a ser cadastrado", example = "joao@email.com")
         String email,
 
-        @Nullable
+        @NotNull
         @Size(max = 20)
         String telefone,
 
