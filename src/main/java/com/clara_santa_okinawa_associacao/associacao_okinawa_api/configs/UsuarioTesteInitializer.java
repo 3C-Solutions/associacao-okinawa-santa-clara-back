@@ -89,6 +89,15 @@ public class UsuarioTesteInitializer implements CommandLineRunner {
         funcao.setNome("Teste local Swagger");
         funcao.setDescricao("Função criada pela carga inicial do perfil dev");
         funcao.getFuncionalidades().add(funcionalidade);
+        FuncionalidadeSistema gerenciarFuncoes = funcionalidadeRepository.findByCodigo("TELA_FUNCOES_SISTEMA")
+                .orElseGet(() -> {
+                    FuncionalidadeSistema nova = new FuncionalidadeSistema();
+                    nova.setCodigo("TELA_FUNCOES_SISTEMA");
+                    nova.setNome("Gerenciar funções do sistema");
+                    nova.setDescricao("Cadastro de perfis e suas permissões de acesso");
+                    return funcionalidadeRepository.save(nova);
+                });
+        funcao.getFuncionalidades().add(gerenciarFuncoes);
         funcao = funcaoRepository.save(funcao);
 
         Usuario usuario = new Usuario();
@@ -102,7 +111,7 @@ public class UsuarioTesteInitializer implements CommandLineRunner {
         usuario.setFuncaoSistema(funcao);
         usuario.setDataCriacao(LocalDateTime.now());
         usuarioRepository.save(usuario);
-        log.info("Usuário de teste criado com a permissão TELA_USUARIOS.");
+        log.info("Usuário de teste criado com as permissões TELA_USUARIOS e TELA_FUNCOES_SISTEMA.");
     }
 
     private Familia criarFamiliaTeste() {
