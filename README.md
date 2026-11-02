@@ -12,6 +12,7 @@ Usuários removidos, desativados ou sem função não podem usar o token. A API 
 sessão e não possui refresh token: ao expirar, faça login novamente.
 
 Os endpoints `/usuarios` exigem a funcionalidade `TELA_USUARIOS` na função do usuário.
+O cadastro em `/funcoes-sistema` exige `TELA_FUNCOES_SISTEMA`.
 O Swagger e o login são públicos; os demais endpoints exigem autenticação.
 
 ## Preparar o ambiente local
@@ -64,8 +65,8 @@ O `.env` está ignorado pelo Git.
 
 A carga inicial só executa quando **o perfil `dev` e `APP_BOOTSTRAP_ENABLED=true`**
 estão ativos. Ela cria um usuário ativo com o e-mail e a senha informados, armazena
-a senha em BCrypt e associa uma função com `TELA_USUARIOS`. Também preenche telefone
-e data de nascimento fictícios e cria uma família com endereço de teste para a conta,
+a senha em BCrypt e associa uma função com `TELA_USUARIOS` e `TELA_FUNCOES_SISTEMA`.
+Também preenche telefone e data de nascimento fictícios e cria uma família com endereço de teste para a conta,
 evitando valores nulos nesses campos obrigatórios do banco.
 
 Se o e-mail já estiver cadastrado, a carga inicial preserva a conta, a senha e as
@@ -112,3 +113,82 @@ sua entrega nem recuperação. Para o primeiro acesso local, utilize a carga ini
 Os testes de autenticação usam a configuração real de segurança e JWT, com
 repositórios simulados. O teste original `contextLoads` precisa das variáveis de
 ambiente e do PostgreSQL para iniciar o contexto completo.
+
+## Cadastro de funções do sistema
+
+`POST /funcoes-sistema` cria um perfil e o vincula às funcionalidades existentes:
+
+```json
+{
+  "nome": "Diretoria",
+  "descricao": "Responsável pela administração da associação",
+  "idsFuncionalidades": [1, 2]
+}
+```
+
+Envie um JWT de usuário com `TELA_FUNCOES_SISTEMA`. O nome é obrigatório, com até
+100 caracteres; a descrição é opcional, com até 255. É necessário informar pelo
+menos um ID de funcionalidade positivo e existente. IDs repetidos geram um único
+vínculo. O cadastro não cria funcionalidades nem altera os usuários existentes.
+
+O serviço remove espaços nas extremidades do nome e consulta se já existe uma
+função com o mesmo nome, desconsiderando maiúsculas e minúsculas. Essa validação
+ocorre no serviço e não garante exclusividade entre cadastros simultâneos.
+
+Resposta `201 Created`:
+
+```json
+{
+  "id": 3,
+  "nome": "Diretoria",
+  "descricao": "Responsável pela administração da associação"
+}
+```
+
+Use o `id` retornado no campo `idFuncaoSistema` do cadastro/edição de usuários.
+
+### Listar funções cadastradas
+
+`GET /funcoes-sistema` lista todas as funções cadastradas, em ordem de ID.
+Envie o JWT de um usuário com `TELA_FUNCOES_SISTEMA`. Os IDs retornados podem ser
+informados em `idFuncaoSistema` no cadastro ou edição de usuários.
+
+Resposta `200 OK`:
+
+```json
+[
+  {
+    "id": 1,
+    "nome": "Diretoria",
+    "descricao": "Administração da associação"
+  }
+]
+```
+
+Quando não há funções cadastradas, retorna `200` com `[]`. A consulta
+retorna `401` sem autenticação válida e `403` sem a permissão necessária.
+
+### Respostas do cadastro
+
+| Status | Situação |
+| --- | --- |
+| `201` | Função e vínculos cadastrados na mesma transação. |
+| `400` | Campos inválidos, corpo ausente ou JSON malformado. |
+| `401` | Token ausente ou inválido. |
+| `403` | Usuário sem `TELA_FUNCOES_SISTEMA`. |
+| `404` | Uma ou mais funcionalidades não existem; nada é cadastrado. |
+| `409` | Nome já cadastrado identificado na consulta do serviço. |
+
+Os erros `400`, `404` e `409` usam `status`, `mensagem` e `timestamp`.
+Os erros `401`/`403` seguem o tratamento do Spring Security existente.
+
+### Conceder a permissão a uma função existente
+
+Para contas existentes, um administrador do banco deve cadastrar a funcionalidade
+com código `TELA_FUNCOES_SISTEMA`, caso ainda não exista, e associá-la à função
+administrativa desejada. Não há script de inicialização automática para essa carga.
+
+A concessão vale para todos os usuários daquela função e autoriza a criação de
+perfis com quaisquer funcionalidades existentes. Reserve-a aos responsáveis pela
+administração dos acessos. As permissões são consultadas a cada requisição; a
+concessão passa a valer com o JWT atual. O bootstrap não modifica contas já criadas.

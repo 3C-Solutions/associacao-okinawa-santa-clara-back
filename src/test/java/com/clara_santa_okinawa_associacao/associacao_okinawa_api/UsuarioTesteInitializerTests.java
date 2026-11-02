@@ -104,7 +104,7 @@ class UsuarioTesteInitializerTests {
         ordem.verify(enderecos).save(any());
         ordem.verify(familias).save(any());
         ordem.verify(usuarios).save(any());
-        assertEquals(Set.of("TELA_USUARIOS"), usuario.getFuncaoSistema().getFuncionalidades()
+        assertEquals(Set.of("TELA_USUARIOS", "TELA_FUNCOES_SISTEMA"), usuario.getFuncaoSistema().getFuncionalidades()
                 .stream().map(FuncionalidadeSistema::getCodigo).collect(java.util.stream.Collectors.toSet()));
     }
 
@@ -120,13 +120,17 @@ class UsuarioTesteInitializerTests {
     void reutilizaPermissaoExistente() {
         FuncionalidadeSistema permissao = new FuncionalidadeSistema();
         permissao.setCodigo("TELA_USUARIOS");
+        FuncionalidadeSistema gerenciarFuncoes = new FuncionalidadeSistema();
+        gerenciarFuncoes.setCodigo("TELA_FUNCOES_SISTEMA");
         when(funcionalidades.findByCodigo("TELA_USUARIOS")).thenReturn(Optional.of(permissao));
+        when(funcionalidades.findByCodigo("TELA_FUNCOES_SISTEMA")).thenReturn(Optional.of(gerenciarFuncoes));
         when(funcoes.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         initializer("SenhaLocal123!").run();
         verify(funcionalidades, never()).save(any());
         ArgumentCaptor<FuncaoSistema> funcao = ArgumentCaptor.forClass(FuncaoSistema.class);
         verify(funcoes).save(funcao.capture());
         assertTrue(funcao.getValue().getFuncionalidades().contains(permissao));
+        assertTrue(funcao.getValue().getFuncionalidades().contains(gerenciarFuncoes));
     }
 
     @Test
