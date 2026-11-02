@@ -11,6 +11,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Funcio
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Usuario;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.GlobalExceptionHandler;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AcessoService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AuthService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.TokenService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioDetailsService;
@@ -40,6 +41,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -62,7 +65,7 @@ class AutenticacaoSwaggerTests {
     })
     @Import({SecurityConfig.class, JwtConfig.class, OpenApiConfig.class,
             PermissoesJwtConverter.class, AuthController.class, UsuarioController.class,
-            AuthService.class, TokenService.class, UsuarioDetailsService.class,
+            AcessoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class})
     static class TestConfig {
     }
@@ -106,6 +109,9 @@ class AutenticacaoSwaggerTests {
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.type").value("http"))
                 .andExpect(jsonPath("$.components.securitySchemes.bearerAuth.scheme").value("bearer"))
                 .andExpect(jsonPath("$.security[0].bearerAuth").isArray())
+                .andExpect(jsonPath("$.paths['/auth/acessos'].get.responses['200'].content['application/json'].schema['$ref']")
+                        .value("#/components/schemas/AcessosResponse"))
+                .andExpect(jsonPath("$.paths['/auth/acessos'].get.security").doesNotExist())
                 .andExpect(jsonPath("$.paths['/auth/login'].post.security", hasSize(0)));
         mvc.perform(get("/swagger-ui/index.html")).andExpect(status().isOk());
     }
@@ -124,6 +130,103 @@ class AutenticacaoSwaggerTests {
         String token = JsonPath.read(resposta, "$.accesToken");
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"telas":["TELA_USUARIOS"]}
+                        """));
+    }
+
+    @Test
+    void acessosRetornamSomenteTelasOrdenadasSemDuplicidadesESemNovaConsulta() throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        adicionarPermissao(usuario, "TELA_USUARIOS");
+        adicionarPermissao(usuario, "EXPORTAR_RELATORIO");
+
+        mvc.perform(get("/auth/acessos")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telas", hasSize(2)))
+                .andExpect(jsonPath("$.telas[0]").value("TELA_FUNCOES_SISTEMA"))
+                .andExpect(jsonPath("$.telas[1]").value("TELA_USUARIOS"));
+
+        verify(usuarioRepository, times(1)).buscarComPermissoes(1);
+    }
+
+    @Test
+    void funcaoSemPermissoesPodeConsultarSeusAcessosVazios() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+
+        mvc.perform(get("/auth/acessos")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telas").isEmpty());
+    }
+
+    @Test
+    void funcaoApenasComPermissoesDeOperacaoRetornaTelasVazias() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        adicionarPermissao(usuario, "EXPORTAR_RELATORIO");
+
+        mvc.perform(get("/auth/acessos")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telas").isEmpty());
+    }
+
+    @Test
+    void acessosSaoDoUsuarioIdentificadoPeloToken() throws Exception {
+        Usuario outroUsuario = new Usuario();
+        outroUsuario.setId(2);
+        outroUsuario.setEmail("outro@example.com");
+        outroUsuario.setAtivo(true);
+        outroUsuario.setFuncaoSistema(new FuncaoSistema());
+        adicionarPermissao(outroUsuario, "TELA_FUNCOES_SISTEMA");
+        when(usuarioRepository.buscarComPermissoes(2)).thenReturn(Optional.of(outroUsuario));
+
+        mvc.perform(get("/auth/acessos")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(2).accesToken()))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"telas":["TELA_FUNCOES_SISTEMA"]}
+                        """));
+    }
+
+    @Test
+    void alteracaoDePermissoesAtualizaAcessosComMesmoToken() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.telas[0]").value("TELA_USUARIOS"));
+
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(content().json("""
+                        {"telas":["TELA_FUNCOES_SISTEMA"]}
+                        """));
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void usuarioRemovidoNaoPodeConsultarAcessos() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        when(usuarioRepository.buscarComPermissoes(1)).thenReturn(Optional.empty());
+
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void usuarioSemFuncaoNaoPodeConsultarAcessos() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        usuario.setFuncaoSistema(null);
+
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -151,6 +254,9 @@ class AutenticacaoSwaggerTests {
         mvc.perform(get("/usuarios")).andExpect(status().isUnauthorized());
         mvc.perform(get("/usuarios").header("Authorization", "Bearer invalido"))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/acessos")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer invalido"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -161,6 +267,8 @@ class AutenticacaoSwaggerTests {
         String token = jwtEncoder.encode(JwtEncoderParameters.from(
                 JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -177,5 +285,13 @@ class AutenticacaoSwaggerTests {
         usuario.setAtivo(false);
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+        mvc.perform(get("/auth/acessos").header("Authorization", "Bearer " + token))
+                .andExpect(status().isUnauthorized());
+    }
+
+    private void adicionarPermissao(Usuario usuario, String codigo) {
+        FuncionalidadeSistema permissao = new FuncionalidadeSistema();
+        permissao.setCodigo(codigo);
+        usuario.getFuncaoSistema().getFuncionalidades().add(permissao);
     }
 }
