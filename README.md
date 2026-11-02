@@ -150,7 +150,9 @@ Use o `id` retornado no campo `idFuncaoSistema` do cadastro/edição de usuário
 ### Listar funções cadastradas
 
 `GET /funcoes-sistema` lista todas as funções cadastradas, em ordem de ID.
-Envie o JWT de um usuário com `TELA_FUNCOES_SISTEMA`. Os IDs retornados podem ser
+Envie o JWT de um usuário com `TELA_FUNCOES_SISTEMA` ou `TELA_USUARIOS`. Essa consulta
+permite selecionar uma função na edição de usuários; o cadastro de funções continua
+restrito a `TELA_FUNCOES_SISTEMA`. Os IDs retornados podem ser
 informados em `idFuncaoSistema` no cadastro ou edição de usuários.
 
 Resposta `200 OK`:

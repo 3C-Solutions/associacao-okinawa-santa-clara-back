@@ -5,6 +5,13 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.JwtConf
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.OpenApiConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.SecurityConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.AuthController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FuncaoSistemaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaCreateRequest;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.UsuarioUpdateRequest;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FuncaoSistemaService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.UsuarioController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.FuncaoSistema;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.FuncionalidadeSistema;
@@ -44,9 +51,14 @@ import java.util.Optional;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.aMapWithSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(classes = AutenticacaoSwaggerTests.TestConfig.class, properties = {
@@ -65,7 +77,7 @@ class AutenticacaoSwaggerTests {
             "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration"
     })
     @Import({SecurityConfig.class, JwtConfig.class, OpenApiConfig.class,
-            PermissoesJwtConverter.class, AuthController.class, UsuarioController.class,
+            PermissoesJwtConverter.class, AuthController.class, UsuarioController.class, FuncaoSistemaController.class,
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class})
     static class TestConfig {
@@ -83,6 +95,8 @@ class AutenticacaoSwaggerTests {
     private UsuarioRepository usuarioRepository;
     @MockitoBean
     private UsuarioService usuarioService;
+    @MockitoBean
+    private FuncaoSistemaService funcaoSistemaService;
 
     private Usuario usuario;
 
@@ -351,6 +365,96 @@ class AutenticacaoSwaggerTests {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"TELA_USUARIOS", "TELA_FUNCOES_SISTEMA", "OUTRA_PERMISSAO"})
+    void consultaECadastroDeFuncoesRespeitamPermissoesDistintas(String permissao) throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        adicionarPermissao(usuario, permissao);
+        when(funcaoSistemaService.listar()).thenReturn(List.of(new FuncaoSistemaResponse(2, "Diretoria", "")));
+        when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
+                .thenReturn(new FuncaoSistemaResponse(3, "Nova função", ""));
+        String token = tokenService.gerarToken(1).accesToken();
+        boolean consultaPermitida = !permissao.equals("OUTRA_PERMISSAO");
+
+        var consulta = mvc.perform(get("/funcoes-sistema").header("Authorization", "Bearer " + token));
+        if (consultaPermitida) {
+            consulta.andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(2));
+        } else {
+            consulta.andExpect(status().isForbidden());
+        }
+        var cadastro = mvc.perform(post("/funcoes-sistema").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"nome":"Nova função","idsFuncionalidades":[1]}
+                        """));
+        if (permissao.equals("TELA_FUNCOES_SISTEMA")) {
+            cadastro.andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(3));
+        } else {
+            cadastro.andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void consultaDeFuncoesSemTokenRetorna401() throws Exception {
+        mvc.perform(get("/funcoes-sistema")).andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"MANTER_ACESSO", "REVOGAR_ACESSO", "DESATIVAR"})
+    void edicaoDaPropriaContaAtualizaFuncaoEPermissoesComMesmoToken(String cenario) throws Exception {
+        boolean ativo = !cenario.equals("DESATIVAR");
+        boolean manterAcesso = cenario.equals("MANTER_ACESSO");
+        FuncaoSistema novaFuncao = new FuncaoSistema();
+        novaFuncao.setId(3);
+        novaFuncao.setNome("Nova função");
+        FuncionalidadeSistema funcionalidade = new FuncionalidadeSistema();
+        funcionalidade.setCodigo(manterAcesso ? "TELA_USUARIOS" : "TELA_FUNCOES_SISTEMA");
+        novaFuncao.getFuncionalidades().add(funcionalidade);
+        FuncaoSistemaRepository funcoes = mock(FuncaoSistemaRepository.class);
+        when(funcoes.findById(3)).thenReturn(Optional.of(novaFuncao));
+        when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        // Serviço e mapper reais, com persistência simulada para dispensar o banco.
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder);
+        when(usuarioService.atualizar(eq(1), any(UsuarioUpdateRequest.class)))
+                .thenAnswer(invocacao -> servico.atualizar(1, invocacao.getArgument(1)));
+        when(usuarioService.buscarPorId(1)).thenAnswer(invocacao -> servico.buscarPorId(1));
+        String token = tokenService.gerarToken(1).accesToken();
+
+        mvc.perform(put("/usuarios/1").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"João atualizado","telefone":"11988887777","ativo":%s,"idFuncaoSistema":3}
+                                """.formatted(ativo)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.funcaoSistema.id").value(3))
+                .andExpect(jsonPath("$.ativo").value(ativo));
+        verify(funcoes).findById(3);
+        verify(usuarioRepository).save(usuario);
+
+        var contexto = mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token));
+        if (!ativo) {
+            contexto.andExpect(status().isUnauthorized());
+        } else {
+            contexto.andExpect(status().isOk())
+                    .andExpect(jsonPath("$.usuario.nome").value("João atualizado"))
+                    .andExpect(jsonPath("$.usuario.funcaoSistema.id").value(3))
+                    .andExpect(jsonPath("$.permissoes", hasSize(1)))
+                    .andExpect(jsonPath("$.permissoes[0]").value(funcionalidade.getCodigo()));
+        }
+        var reabrir = mvc.perform(get("/usuarios/1").header("Authorization", "Bearer " + token));
+        if (manterAcesso) {
+            reabrir.andExpect(status().isOk())
+                    .andExpect(jsonPath("$.nome").value("João atualizado"))
+                    .andExpect(jsonPath("$.telefone").value("11988887777"))
+                    .andExpect(jsonPath("$.funcaoSistema.id").value(3));
+        } else if (ativo) {
+            reabrir.andExpect(status().isForbidden());
+        } else {
+            reabrir.andExpect(status().isUnauthorized());
+        }
     }
 
     private void adicionarPermissao(Usuario usuario, String codigo) {
