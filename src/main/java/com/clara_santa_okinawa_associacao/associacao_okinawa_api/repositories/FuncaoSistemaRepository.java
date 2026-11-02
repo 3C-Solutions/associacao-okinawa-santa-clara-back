@@ -6,6 +6,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FuncaoSistemaRepository extends JpaRepository<FuncaoSistema, Integer> {
+    @Query("select distinct f from FuncaoSistema f left join fetch f.funcionalidades where f.id = :id")
+    java.util.Optional<FuncaoSistema> buscarComFuncionalidades(@Param("id") Integer id);
+
     @Query("""
             SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END
             FROM FuncaoSistema f

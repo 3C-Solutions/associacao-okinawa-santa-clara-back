@@ -28,6 +28,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.TokenS
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioDetailsService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioService;
 import com.jayway.jsonpath.JsonPath;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaFuncionalidadesRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -587,6 +588,88 @@ class AutenticacaoSwaggerTests {
         funcionalidade.setDescricao("Consulta de relatórios");
         funcionalidade.setCodigo("RELATORIOS");
         return funcionalidade;
+    }
+
+    @Test
+    void detalhesEEdicaoDeAcessosExigemPermissaoAdministrativa() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(get("/funcoes-sistema/2")).andExpect(status().isUnauthorized());
+        mvc.perform(put("/funcoes-sistema/2/funcionalidades").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"idsFuncionalidades\":[]}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/funcoes-sistema/2").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/funcoes-sistema/2/funcionalidades").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"idsFuncionalidades\":[]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"LISTA_AUSENTE", "ID_INVALIDO"})
+    void edicaoDeAcessosValidaIds(String cenario) throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        String ids = cenario.equals("LISTA_AUSENTE") ? "null" : cenario.equals("ID_INVALIDO") ? "[0]" : "[]";
+        mvc.perform(put("/funcoes-sistema/2/funcionalidades")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"idsFuncionalidades":%s}
+                                """.formatted(ids)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(funcaoSistemaService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void editarPerfilAtualizaTodosOsUsuariosComMesmoToken(boolean removerTodos) throws Exception {
+        // Os dois usuários compartilham a mesma função, como ocorre na relação do banco.
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        FuncionalidadeSistema gerenciar = funcionalidadeDeTeste();
+        gerenciar.setCodigo("TELA_FUNCOES_SISTEMA");
+        usuario.getFuncaoSistema().getFuncionalidades().add(gerenciar);
+        Usuario outro = new Usuario();
+        outro.setId(2);
+        outro.setNome("Outra pessoa");
+        outro.setEmail("outra@example.com");
+        outro.setAtivo(true);
+        outro.setFuncaoSistema(usuario.getFuncaoSistema());
+        when(usuarioRepository.buscarComPermissoes(2)).thenReturn(Optional.of(outro));
+        FuncaoSistemaRepository funcoes = mock(FuncaoSistemaRepository.class);
+        when(funcoes.buscarComFuncionalidades(2)).thenReturn(Optional.of(usuario.getFuncaoSistema()));
+        when(funcoes.saveAndFlush(any(FuncaoSistema.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        when(funcionalidadeSistemaRepository.findAllById(any())).thenReturn(removerTodos ? List.of() : List.of(funcionalidadeDeTeste()));
+        FuncaoSistemaService servico = new FuncaoSistemaService(funcoes, funcionalidadeSistemaRepository);
+        when(funcaoSistemaService.buscar(2)).thenAnswer(invocacao -> servico.buscar(2));
+        when(funcaoSistemaService.atualizarFuncionalidades(eq(2), any(FuncaoSistemaFuncionalidadesRequest.class)))
+                .thenAnswer(invocacao -> servico.atualizarFuncionalidades(2, invocacao.getArgument(1)));
+        String token = tokenService.gerarToken(1).accesToken();
+        String outroToken = tokenService.gerarToken(2).accesToken();
+        mvc.perform(get("/funcoes-sistema/2").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", aMapWithSize(4)))
+                .andExpect(jsonPath("$.funcionalidades[0].codigo").value("TELA_FUNCOES_SISTEMA"));
+        mvc.perform(put("/funcoes-sistema/2/funcionalidades").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"idsFuncionalidades":%s}
+                                """.formatted(removerTodos ? "[]" : "[7]")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.funcionalidades", hasSize(removerTodos ? 0 : 1)));
+        for (String credencial : List.of(token, outroToken)) {
+            var me = mvc.perform(get("/auth/me").header("Authorization", "Bearer " + credencial))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.permissoes", hasSize(removerTodos ? 0 : 1)));
+            if (!removerTodos) me.andExpect(jsonPath("$.permissoes[0]").value("RELATORIOS"));
+            mvc.perform(get("/funcoes-sistema/2").header("Authorization", "Bearer " + credencial))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void listaDeUsuariosVaziaRetornaArrayJson() throws Exception {
+        when(usuarioRepository.findAll()).thenReturn(List.of());
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), mock(FuncaoSistemaRepository.class), passwordEncoder);
+        when(usuarioService.listar()).thenAnswer(invocacao -> servico.listar());
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
     }
 
     private void adicionarPermissao(Usuario usuario, String codigo) {

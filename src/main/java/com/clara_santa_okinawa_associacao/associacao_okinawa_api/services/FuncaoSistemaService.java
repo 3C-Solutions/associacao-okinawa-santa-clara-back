@@ -9,6 +9,10 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.NotE
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.FuncaoSistemaMapper;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncionalidadeSistemaRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaDetalheResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaFuncionalidadesRequest;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcionalidade.sistema.FuncionalidadeSistemaResponse;
+import java.util.Comparator;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +57,38 @@ public class FuncaoSistemaService {
 
         funcao.setFuncionalidades(new HashSet<>(funcionalidades));
         return FuncaoSistemaMapper.toResponse(funcaoSistemaRepository.save(funcao));
+    }
+
+    @Transactional(readOnly = true)
+    public FuncaoSistemaDetalheResponse buscar(Integer id) {
+        return detalhar(buscarEntidade(id));
+    }
+
+    @Transactional
+    public FuncaoSistemaDetalheResponse atualizarFuncionalidades(Integer id, FuncaoSistemaFuncionalidadesRequest request) {
+        FuncaoSistema funcao = buscarEntidade(id);
+        List<FuncionalidadeSistema> funcionalidades = funcionalidadeSistemaRepository.findAllById(request.idsFuncionalidades());
+        Set<Integer> ausentes = new TreeSet<>(request.idsFuncionalidades());
+        funcionalidades.forEach(item -> ausentes.remove(item.getId()));
+        if (!ausentes.isEmpty()) throw new NotExistsByIdException("Funcionalidades não encontradas: " + ausentes);
+        // Preserva a coleção gerenciada para que o Hibernate controle os vínculos no flush.
+        if (!funcao.getFuncionalidades().equals(new HashSet<>(funcionalidades))) {
+            funcao.getFuncionalidades().clear();
+            funcao.getFuncionalidades().addAll(funcionalidades);
+        }
+        return detalhar(funcaoSistemaRepository.saveAndFlush(funcao));
+    }
+
+    private FuncaoSistema buscarEntidade(Integer id) {
+        return funcaoSistemaRepository.buscarComFuncionalidades(id)
+                .orElseThrow(() -> new NotExistsByIdException("Função do sistema não encontrada: " + id));
+    }
+
+    private FuncaoSistemaDetalheResponse detalhar(FuncaoSistema funcao) {
+        return new FuncaoSistemaDetalheResponse(funcao.getId(), funcao.getNome(), funcao.getDescricao(),
+                funcao.getFuncionalidades().stream().sorted(Comparator.comparing(FuncionalidadeSistema::getId))
+                        .map(item -> new FuncionalidadeSistemaResponse(item.getId(), item.getNome(), item.getDescricao(), item.getCodigo()))
+                        .toList());
     }
 
     private AlreadyExistsByNomeException nomeJaCadastrado() {

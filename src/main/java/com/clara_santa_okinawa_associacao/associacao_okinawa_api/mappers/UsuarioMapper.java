@@ -25,7 +25,7 @@ public class UsuarioMapper {
     }
 
     public static List<UsuarioResponse> toResponse(List<Usuario> associados) {
-        if (associados == null || associados.isEmpty()) return null;
+        if (associados == null || associados.isEmpty()) return List.of();
 
         return associados.stream().map(UsuarioMapper::toResponse).toList();
     }
