@@ -1,10 +1,10 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.AcessosResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.UsuarioAutenticadoContextoResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.LoginRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.LoginResponse;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AcessoService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AuthService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioAutenticadoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -31,27 +31,28 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
-    private final AcessoService acessoService;
+    private final UsuarioAutenticadoService usuarioAutenticadoService;
 
-    public AuthController(AuthService authService, AcessoService acessoService) {
+    public AuthController(AuthService authService, UsuarioAutenticadoService usuarioAutenticadoService) {
         this.authService = authService;
-        this.acessoService = acessoService;
+        this.usuarioAutenticadoService = usuarioAutenticadoService;
     }
 
-    @GetMapping("/acessos")
+    @GetMapping("/me")
     @Operation(
-            summary = "Consulta das telas permitidas ao usuário autenticado",
-            description = "Retorna os códigos TELA_ concedidos à função do usuário autenticado, sem duplicidades e em ordem alfabética. Exige apenas autenticação válida."
+            summary = "Consulta do usuário autenticado e seus acessos",
+            description = "Retorna identificação, função e permissões do usuário identificado pelo token. Cada permissão corresponde ao acesso a uma tela. Os códigos são únicos e ordenados alfabeticamente. Exige apenas autenticação válida."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Telas permitidas; lista vazia quando não há telas disponíveis",
+            @ApiResponse(responseCode = "200", description = "Usuário e acessos atuais; lista de permissões vazia quando não há acessos",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = AcessosResponse.class))),
+                            schema = @Schema(implementation = UsuarioAutenticadoContextoResponse.class))),
             @ApiResponse(responseCode = "401", description = "Token ausente, inválido ou expirado; usuário removido, inativo ou sem função",
                     content = @Content)
     })
-    public ResponseEntity<AcessosResponse> listarAcessos(JwtAuthenticationToken authentication) {
-        return ResponseEntity.ok(acessoService.listar(authentication.getAuthorities()));
+    public ResponseEntity<UsuarioAutenticadoContextoResponse> consultarUsuarioAutenticado(JwtAuthenticationToken authentication) {
+        Integer usuarioId = Integer.valueOf(authentication.getToken().getSubject());
+        return ResponseEntity.ok(usuarioAutenticadoService.consultar(usuarioId));
     }
 
     @Operation(
