@@ -30,7 +30,6 @@ public class FuncaoSistemaService {
         this.funcionalidadeSistemaRepository = funcionalidadeSistemaRepository;
     }
 
-    @Transactional(readOnly = true)
     public List<FuncaoSistemaResponse> listar() {
         return funcaoSistemaRepository.findAll(Sort.by("id")).stream()
                 .map(FuncaoSistemaMapper::toResponse)
