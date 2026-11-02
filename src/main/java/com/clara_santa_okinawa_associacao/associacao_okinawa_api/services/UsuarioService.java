@@ -29,15 +29,17 @@ public class UsuarioService {
     private final FamiliaRepository familiaRepository;
     private final FuncaoSistemaRepository funcaoSistemaRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           FamiliaRepository familiaRepository,
                           FuncaoSistemaRepository funcaoSistemaRepository,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder, EmailService emailService) {
         this.usuarioRepository = usuarioRepository;
         this.familiaRepository = familiaRepository;
         this.funcaoSistemaRepository = funcaoSistemaRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
     public List<UsuarioResponse> listar() {
@@ -74,13 +76,20 @@ public class UsuarioService {
                         "Função do sistema não encontrada " + idFuncaoSistemaDesejada));
 
 
+        String senhaProvisoria = gerarSenha();
+
         Usuario novoUsuario = UsuarioMapper.toEntity(request);
         novoUsuario.setFamilia(familia);
-        novoUsuario.setSenha(passwordEncoder.encode(gerarSenha()));
+        novoUsuario.setSenha(passwordEncoder.encode(senhaProvisoria));
         novoUsuario.setFuncaoSistema(funcaoSistema);
         novoUsuario.setDataCriacao(LocalDateTime.now());
-
         Usuario usuarioCadastrado = usuarioRepository.save(novoUsuario);
+
+        String mensagemEmail = montarMensagemEmail(usuarioCadastrado.getNome(),senhaProvisoria);
+
+        emailService.enviarEmail(usuarioCadastrado.getEmail(), "Senha provisória",
+                mensagemEmail);
+
         return UsuarioMapper.toResponse(usuarioCadastrado);
     }
 
@@ -125,5 +134,20 @@ public class UsuarioService {
 
     private String normalizarEmail(String email) {
         return email.trim().toLowerCase();
+    }
+
+    public String montarMensagemEmail(String nome, String senhaProvisoria) {
+
+        String mensagem = """
+                Olá, %s!
+                
+                Seu cadastro foi realizado com sucesso.
+                
+                Seja bem-vindo à nossa plataforma! Aqui está a sua senha provisória para acessar a sua conta
+                
+                %s
+                """;
+
+        return mensagem.formatted(nome, senhaProvisoria);
     }
 }
