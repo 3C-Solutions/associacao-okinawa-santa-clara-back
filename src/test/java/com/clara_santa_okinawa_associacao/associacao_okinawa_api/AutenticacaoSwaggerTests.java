@@ -5,6 +5,10 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.JwtConf
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.OpenApiConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.SecurityConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.AuthController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FuncionalidadeSistemaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FuncionalidadeSistemaService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncionalidadeSistemaRepository;
+import org.springframework.data.domain.Sort;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FuncaoSistemaController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaCreateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaResponse;
@@ -54,6 +58,8 @@ import static org.hamcrest.Matchers.aMapWithSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -79,7 +85,7 @@ class AutenticacaoSwaggerTests {
     @Import({SecurityConfig.class, JwtConfig.class, OpenApiConfig.class,
             PermissoesJwtConverter.class, AuthController.class, UsuarioController.class, FuncaoSistemaController.class,
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
-            GlobalExceptionHandler.class})
+            GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class})
     static class TestConfig {
     }
 
@@ -97,6 +103,8 @@ class AutenticacaoSwaggerTests {
     private UsuarioService usuarioService;
     @MockitoBean
     private FuncaoSistemaService funcaoSistemaService;
+    @MockitoBean
+    private FuncionalidadeSistemaRepository funcionalidadeSistemaRepository;
 
     private Usuario usuario;
 
@@ -455,6 +463,130 @@ class AutenticacaoSwaggerTests {
         } else {
             reabrir.andExpect(status().isUnauthorized());
         }
+    }
+
+    @Test
+    void catalogoExigeGerenciamentoDeFuncoesERetornaTodosOsCodigos() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(get("/funcionalidades-sistema")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/funcionalidades-sistema").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(funcionalidadeSistemaRepository);
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        FuncionalidadeSistema funcionalidade = funcionalidadeDeTeste();
+        when(funcionalidadeSistemaRepository.findAll(Sort.by("id"))).thenReturn(List.of(funcionalidade));
+        mvc.perform(get("/funcionalidades-sistema").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0]", aMapWithSize(4)))
+                .andExpect(jsonPath("$[0].id").value(7))
+                .andExpect(jsonPath("$[0].nome").value("Relatórios"))
+                .andExpect(jsonPath("$[0].descricao").value("Consulta de relatórios"))
+                .andExpect(jsonPath("$[0].codigo").value("RELATORIOS"));
+        verify(funcionalidadeSistemaRepository).findAll(Sort.by("id"));
+    }
+
+    @Test
+    void catalogoVazioRetornaArrayVazio() throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        when(funcionalidadeSistemaRepository.findAll(Sort.by("id"))).thenReturn(List.of());
+        mvc.perform(get("/funcionalidades-sistema")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"SEM_NOME", "NOME_LONGO", "DESCRICAO_LONGA", "SEM_FUNCIONALIDADES", "ID_INVALIDO"})
+    void cadastroDeFuncaoValidaCamposAntesDeChamarServico(String cenario) throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        String nome = cenario.equals("SEM_NOME") ? " " : cenario.equals("NOME_LONGO") ? "x".repeat(101) : "Nova função";
+        String descricao = cenario.equals("DESCRICAO_LONGA") ? "x".repeat(256) : "Descrição";
+        String ids = cenario.equals("SEM_FUNCIONALIDADES") ? "[]" : cenario.equals("ID_INVALIDO") ? "[0]" : "[7]";
+        mvc.perform(post("/funcoes-sistema")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"%s","descricao":"%s","idsFuncionalidades":%s}
+                                """.formatted(nome, descricao, ids)))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(funcaoSistemaService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"NOME_DUPLICADO", "FUNCIONALIDADE_REMOVIDA"})
+    void cadastroDeFuncaoNaoSalvaQuandoNomeOuFuncionalidadesSaoInvalidos(String cenario) throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        FuncaoSistemaRepository funcoes = mock(FuncaoSistemaRepository.class);
+        when(funcoes.existsByNomeNormalizado("Nova função")).thenReturn(cenario.equals("NOME_DUPLICADO"));
+        when(funcionalidadeSistemaRepository.findAllById(any())).thenReturn(List.of());
+        FuncaoSistemaService servico = new FuncaoSistemaService(funcoes, funcionalidadeSistemaRepository);
+        when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
+                .thenAnswer(invocacao -> servico.cadastrar(invocacao.getArgument(0)));
+        mvc.perform(post("/funcoes-sistema")
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"  Nova função  ","idsFuncionalidades":[7]}
+                                """))
+                .andExpect(status().is(cenario.equals("NOME_DUPLICADO") ? 409 : 404));
+        verify(funcoes, never()).save(any());
+    }
+
+    @Test
+    void funcaoCriadaPodeSerListadaEAtribuidaComPermissoesReais() throws Exception {
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
+        FuncaoSistemaRepository funcoes = mock(FuncaoSistemaRepository.class);
+        FuncaoSistema[] criada = new FuncaoSistema[1];
+        when(funcionalidadeSistemaRepository.findAllById(any())).thenReturn(List.of(funcionalidadeDeTeste()));
+        when(funcoes.save(any(FuncaoSistema.class))).thenAnswer(invocacao -> {
+            criada[0] = invocacao.getArgument(0);
+            criada[0].setId(3);
+            return criada[0];
+        });
+        when(funcoes.findAll(Sort.by("id"))).thenAnswer(invocacao -> List.of(criada[0]));
+        when(funcoes.findById(3)).thenAnswer(invocacao -> Optional.ofNullable(criada[0]));
+        FuncaoSistemaService servicoFuncoes = new FuncaoSistemaService(funcoes, funcionalidadeSistemaRepository);
+        when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
+                .thenAnswer(invocacao -> servicoFuncoes.cadastrar(invocacao.getArgument(0)));
+        when(funcaoSistemaService.listar()).thenAnswer(invocacao -> servicoFuncoes.listar());
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(post("/funcoes-sistema").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"  Relatórios  ","descricao":"Consulta","idsFuncionalidades":[7,7]}
+                                """))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(3))
+                .andExpect(jsonPath("$.nome").value("Relatórios"));
+        mvc.perform(get("/funcoes-sistema").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].id").value(3));
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.usuario.funcaoSistema.id").value(2));
+        when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        UsuarioService servicoUsuarios = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder);
+        when(usuarioService.atualizar(eq(1), any(UsuarioUpdateRequest.class)))
+                .thenAnswer(invocacao -> servicoUsuarios.atualizar(1, invocacao.getArgument(1)));
+        mvc.perform(put("/usuarios/1").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nome":"João","ativo":true,"idFuncaoSistema":3}
+                                """))
+                .andExpect(status().isOk());
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.usuario.funcaoSistema.id").value(3))
+                .andExpect(jsonPath("$.permissoes", hasSize(1)))
+                .andExpect(jsonPath("$.permissoes[0]").value("RELATORIOS"));
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+    }
+
+    private FuncionalidadeSistema funcionalidadeDeTeste() {
+        FuncionalidadeSistema funcionalidade = new FuncionalidadeSistema();
+        funcionalidade.setId(7);
+        funcionalidade.setNome("Relatórios");
+        funcionalidade.setDescricao("Consulta de relatórios");
+        funcionalidade.setCodigo("RELATORIOS");
+        return funcionalidade;
     }
 
     private void adicionarPermissao(Usuario usuario, String codigo) {

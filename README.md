@@ -194,3 +194,14 @@ A concessão vale para todos os usuários daquela função e autoriza a criaçã
 perfis com quaisquer funcionalidades existentes. Reserve-a aos responsáveis pela
 administração dos acessos. As permissões são consultadas a cada requisição; a
 concessão passa a valer com o JWT atual. O bootstrap não modifica contas já criadas.
+
+## Catálogo de funcionalidades
+
+`GET /funcionalidades-sistema` retorna todas as funcionalidades cadastradas no banco,
+em ordem de ID, sem filtrar pelo prefixo do código. Exige `TELA_FUNCOES_SISTEMA`.
+Cada item possui `id`, `nome`, `descricao` e `codigo`; catálogo vazio retorna `200` com `[]`.
+Sem autenticação válida retorna `401`; sem essa permissão retorna `403`.
+
+O formulário de criação de funções consulta esse catálogo e envia os IDs selecionados
+em `idsFuncionalidades` para `POST /funcoes-sistema`. Criar uma função não altera
+contas existentes: a atribuição ocorre pela edição de usuários.
