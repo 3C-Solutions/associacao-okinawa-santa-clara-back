@@ -22,6 +22,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaDetalheResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.funcao.sistema.FuncaoSistemaFuncionalidadesRequest;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/funcoes-sistema")
@@ -47,6 +51,32 @@ public class FuncaoSistemaController {
     })
     public ResponseEntity<List<FuncaoSistemaResponse>> listar() {
         return ResponseEntity.ok(funcaoSistemaService.listar());
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Consulta uma função com suas funcionalidades", description = "Exige TELA_FUNCOES_SISTEMA.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Função encontrada"),
+            @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Sem permissão", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Função não encontrada", content = @Content)
+    })
+    public ResponseEntity<FuncaoSistemaDetalheResponse> buscar(@PathVariable Integer id) {
+        return ResponseEntity.ok(funcaoSistemaService.buscar(id));
+    }
+
+    @PutMapping("/{id}/funcionalidades")
+    @Operation(summary = "Substitui as funcionalidades da função", description = "Exige TELA_FUNCOES_SISTEMA. Aceita lista vazia para remover todos os acessos.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Acessos atualizados"),
+            @ApiResponse(responseCode = "400", description = "Dados inválidos", content = @Content),
+            @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida", content = @Content),
+            @ApiResponse(responseCode = "403", description = "Sem permissão", content = @Content),
+            @ApiResponse(responseCode = "404", description = "Função ou funcionalidade não encontrada", content = @Content)
+    })
+    public ResponseEntity<FuncaoSistemaDetalheResponse> atualizarFuncionalidades(@PathVariable Integer id,
+            @Valid @RequestBody FuncaoSistemaFuncionalidadesRequest request) {
+        return ResponseEntity.ok(funcaoSistemaService.atualizarFuncionalidades(id, request));
     }
 
     @PostMapping

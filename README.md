@@ -205,3 +205,30 @@ Sem autenticação válida retorna `401`; sem essa permissão retorna `403`.
 O formulário de criação de funções consulta esse catálogo e envia os IDs selecionados
 em `idsFuncionalidades` para `POST /funcoes-sistema`. Criar uma função não altera
 contas existentes: a atribuição ocorre pela edição de usuários.
+
+## Edição dos acessos de funções existentes
+
+`GET /funcoes-sistema/{id}` retorna `id`, `nome`, `descricao` e
+`funcionalidades` (itens com `id`, `nome`, `descricao`, `codigo`, em ordem de ID).
+`PUT /funcoes-sistema/{id}/funcionalidades` substitui os vínculos da função em uma
+única transação. Ambos exigem `TELA_FUNCOES_SISTEMA`; a listagem resumida mantém seu contrato.
+
+Exemplo de atualização:
+
+```json
+{"idsFuncionalidades":[1,3]}
+```
+
+Na atualização, `[]` remove todas as telas do perfil. Nome e descrição não são alterados.
+O cadastro continua exigindo pelo menos uma funcionalidade. IDs inválidos ou lista
+ausente geram `400`; função ou funcionalidades inexistentes geram `404`.
+Os usuários continuam vinculados à mesma função e as permissões novas valem nas
+próximas requisições, inclusive com o JWT atual. Uma função sem funcionalidades mantém
+seus usuários autenticados, com a lista de permissões vazia.
+
+`GET /usuarios` agora retorna `200` com `[]` quando não há usuários, em vez de `null`.
+Os mapeamentos de objetos individuais permanecem com o comportamento anterior.
+
+```powershell
+.\mvnw.cmd "-Dtest=AutenticacaoSwaggerTests,UsuarioTesteInitializerTests" test
+```
