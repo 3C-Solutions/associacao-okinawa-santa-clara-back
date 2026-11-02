@@ -36,8 +36,9 @@ public class FuncaoSistemaController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyAuthority('TELA_FUNCOES_SISTEMA', 'TELA_USUARIOS')")
     @Operation(summary = "Listagem das funções cadastradas",
-            description = "Lista todas as funções em ordem de ID. Exige TELA_FUNCOES_SISTEMA.")
+            description = "Lista todas as funções em ordem de ID. Exige TELA_FUNCOES_SISTEMA ou TELA_USUARIOS.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Funções listadas; lista vazia quando não há registros",
                     content = @Content(array = @ArraySchema(schema = @Schema(implementation = FuncaoSistemaResponse.class)))),
