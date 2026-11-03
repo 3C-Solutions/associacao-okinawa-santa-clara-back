@@ -10,7 +10,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
         "endereco"
 })
 
-@Schema(description = "Dados que serão devolvidos como resposta de um requisição")
+@Schema(description = "Dados da família cadastrada e seu endereço completo")
 public record FamiliaResponse(
         @Schema(description = "Identificador único da família", example = "1")
         Integer id,
