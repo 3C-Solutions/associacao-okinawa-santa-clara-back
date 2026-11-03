@@ -1,9 +1,19 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers;
 
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.familia.FamiliaRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.familia.FamiliaResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Familia;
 
 public class FamiliaMapper {
+
+
+    public Familia toEntity(FamiliaRequest dto){
+        Familia entidade = new Familia();
+
+        entidade.setNome(dto.getNome());
+
+        return entidade;
+    }
 
     public static FamiliaResponse toResponse(Familia familia) {
         if (familia == null) return null;
