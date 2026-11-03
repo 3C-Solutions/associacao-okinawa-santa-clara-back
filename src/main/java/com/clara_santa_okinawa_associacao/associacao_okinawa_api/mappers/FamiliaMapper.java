@@ -7,7 +7,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Famili
 public class FamiliaMapper {
 
 
-    public Familia toEntity(FamiliaRequest dto){
+    public static Familia toEntity(FamiliaRequest dto) {
         Familia entidade = new Familia();
 
         entidade.setNome(dto.getNome());
