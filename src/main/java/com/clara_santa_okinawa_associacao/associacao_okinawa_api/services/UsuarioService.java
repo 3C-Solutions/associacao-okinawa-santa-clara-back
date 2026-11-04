@@ -12,8 +12,11 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.Usuario
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
@@ -113,12 +116,26 @@ public class UsuarioService {
         return UsuarioMapper.toResponse(usuarioAtualizado);
     }
 
-    public void excluir(Integer id) {
-        if (!usuarioRepository.existsById(id)) {
-            throw new NotExistsByIdException("Usuário não encontrado " + id);
+    /**
+     * Exclusão lógica: o usuário é inativado (perde o acesso) e o registro é mantido,
+     * preservando o histórico financeiro e demais vínculos. Repetir a exclusão não tem efeito.
+     */
+    @Transactional
+    public void excluir(Integer id, Integer idUsuarioAutenticado) {
+        Usuario usuario = usuarioRepository.findById(id).orElseThrow(() -> new NotExistsByIdException(
+                "Usuário não encontrado " + id));
+
+        if (id.equals(idUsuarioAutenticado)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Não é possível excluir a própria conta");
         }
 
-        usuarioRepository.deleteById(id);
+        if (!usuario.isAtivo()) {
+            return;
+        }
+
+        usuario.setAtivo(false);
+        usuarioRepository.save(usuario);
     }
 
     private String gerarSenha() {

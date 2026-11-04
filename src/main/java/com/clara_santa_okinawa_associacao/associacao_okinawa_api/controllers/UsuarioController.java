@@ -17,6 +17,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -237,10 +238,14 @@ public class UsuarioController {
 
     @Operation(
             summary = "Exclusão de um usuário",
-            description = "Exclui um usuário do sistema pelo identificador único"
+            description = "Exclusão lógica: inativa o usuário, que perde o acesso ao sistema. "
+                    + "O registro é mantido para preservar o histórico. Não é permitido excluir a própria conta."
     )
     @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "Usuário excluído com sucesso"),
+            @ApiResponse(responseCode = "204", description = "Usuário inativado com sucesso (ou já estava inativo)"),
+            @ApiResponse(responseCode = "409", description = "Tentativa de excluir a própria conta",
+                    content = @Content(mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(
                     responseCode = "404",
                     description = "Usuário não existe no sistema",
@@ -261,8 +266,10 @@ public class UsuarioController {
     })
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Integer id) {
-        usuarioService.excluir(id);
+    public ResponseEntity<Void> deletar(@PathVariable Integer id,
+                                        JwtAuthenticationToken authentication) {
+        Integer idUsuarioAutenticado = Integer.valueOf(authentication.getToken().getSubject());
+        usuarioService.excluir(id, idUsuarioAutenticado);
 
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
