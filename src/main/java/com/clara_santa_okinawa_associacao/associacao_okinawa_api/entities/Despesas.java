@@ -8,9 +8,9 @@ import java.time.LocalDate;
 public class Despesas {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "iddespesas")
+    @Column(name = "id")
     private Integer idDespesas;
-    @Column(name = "dtdepesa")
+    @Column(name = "data_despesa")
     private LocalDate dtDepesa;
     @Column(name = "descricao")
     private String descricao;
@@ -20,9 +20,9 @@ public class Despesas {
     private BigDecimal valor;
     @Column(name = "status")
     private String status;
-    @Column(name = "fkusuario")
+    @Column(name = "fk_usuario")
     private Integer fkUsuario;
-    @Column(name = "fkfamilia")
+    @Column(name = "fk_familia")
     private Integer fkFamilia;
     public Integer getIdDespesas() { return idDespesas; }
     public void setIdDespesas(Integer value) { this.idDespesas = value; }

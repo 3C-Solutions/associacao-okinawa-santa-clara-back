@@ -24,6 +24,12 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.Glob
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioAutenticadoService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AuthService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.EmailService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.DespesasService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FinanceiroDashboardService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.DespesasController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FinanceiroDashboardController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.DespesasCreateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.TokenService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioDetailsService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioService;
@@ -62,6 +68,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -79,6 +86,7 @@ class AutenticacaoSwaggerTests {
     @Configuration(proxyBeanMethods = false)
     @TestComponent
     @EnableAutoConfiguration(excludeName = {
+            "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration",
             "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
             "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
             "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration"
@@ -86,7 +94,8 @@ class AutenticacaoSwaggerTests {
     @Import({SecurityConfig.class, JwtConfig.class, OpenApiConfig.class,
             PermissoesJwtConverter.class, AuthController.class, UsuarioController.class, FuncaoSistemaController.class,
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
-            GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class})
+            GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class,
+            DespesasController.class, FinanceiroDashboardController.class})
     static class TestConfig {
     }
 
@@ -108,6 +117,41 @@ class AutenticacaoSwaggerTests {
     private FuncionalidadeSistemaRepository funcionalidadeSistemaRepository;
 
     private Usuario usuario;
+
+    @MockitoBean
+    private DespesasService despesasService;
+    @MockitoBean
+    private FinanceiroDashboardService financeiroService;
+
+    @Test
+    void financeiroExigeAutenticacaoEPermissao() throws Exception {
+        mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11")
+                .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(financeiroService);
+    }
+
+    @Test
+    void despesaUsaIdDoTokenERejeitaValorComMaisDeDuasCasas() throws Exception {
+        adicionarPermissao(usuario, "TELA_FINANCEIRO");
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(post("/api/financeiro/despesas").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"dtDepesa":"2026-11-03","descricao":"Materiais","categoria":"Outros","valor":12.50,"status":"Pago","fkUsuario":999}
+                    """))
+                .andExpect(status().isCreated());
+        verify(despesasService).criar(any(DespesasCreateRequest.class), eq(1));
+        mvc.perform(post("/api/financeiro/despesas").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"dtDepesa":"2026-11-03","descricao":"Materiais","categoria":"Outros","valor":12.501,"status":"Pago"}
+                    """))
+                .andExpect(status().isBadRequest());
+        verify(despesasService, times(1)).criar(any(), eq(1));
+    }
 
     @BeforeEach
     void prepararUsuario() {
@@ -426,7 +470,7 @@ class AutenticacaoSwaggerTests {
         when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
         // Serviço e mapper reais, com persistência simulada para dispensar o banco.
-        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder);
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder, mock(EmailService.class));
         when(usuarioService.atualizar(eq(1), any(UsuarioUpdateRequest.class)))
                 .thenAnswer(invocacao -> servico.atualizar(1, invocacao.getArgument(1)));
         when(usuarioService.buscarPorId(1)).thenAnswer(invocacao -> servico.buscarPorId(1));
@@ -564,7 +608,7 @@ class AutenticacaoSwaggerTests {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.usuario.funcaoSistema.id").value(2));
         when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
         when(usuarioRepository.save(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
-        UsuarioService servicoUsuarios = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder);
+        UsuarioService servicoUsuarios = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), funcoes, passwordEncoder, mock(EmailService.class));
         when(usuarioService.atualizar(eq(1), any(UsuarioUpdateRequest.class)))
                 .thenAnswer(invocacao -> servicoUsuarios.atualizar(1, invocacao.getArgument(1)));
         mvc.perform(put("/usuarios/1").header("Authorization", "Bearer " + token)
@@ -666,7 +710,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void listaDeUsuariosVaziaRetornaArrayJson() throws Exception {
         when(usuarioRepository.findAll()).thenReturn(List.of());
-        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), mock(FuncaoSistemaRepository.class), passwordEncoder);
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
         when(usuarioService.listar()).thenAnswer(invocacao -> servico.listar());
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
                 .andExpect(status().isOk()).andExpect(content().json("[]"));

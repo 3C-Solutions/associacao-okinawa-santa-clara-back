@@ -19,14 +19,16 @@ public class FinanceiroDashboardService {
     private final PagamentoDepartamentoRepository pagamentosDepartamento;
     private final AnuidadeRepository anuidades;
     private final MensalidadeRepository mensalidades;
+    private final EntradaFinanceiraRepository entradas;
     public FinanceiroDashboardService(DespesasRepository despesas, PagamentoRepository pagamentos,
                                       PagamentoDepartamentoRepository pagamentosDepartamento, AnuidadeRepository anuidades,
-                                      MensalidadeRepository mensalidades) {
+                                      MensalidadeRepository mensalidades, EntradaFinanceiraRepository entradas) {
         this.despesas = despesas;
         this.pagamentos = pagamentos;
         this.pagamentosDepartamento = pagamentosDepartamento;
         this.anuidades = anuidades;
         this.mensalidades = mensalidades;
+        this.entradas = entradas;
     }
     private BigDecimal saldo(List<LancamentoFinanceiroResponse> itens, YearMonth periodo) {
         BigDecimal total = BigDecimal.ZERO;
@@ -49,6 +51,12 @@ public class FinanceiroDashboardService {
         for (Mensalidade m : mensalidades.findAll()) valoresMensalidade.put(m.getIdMensalidade(),
                 FinanceiroRegras.valor(m.getValor()));
         List<LancamentoFinanceiroResponse> itens = new ArrayList<>();
+        for (EntradaFinanceira e : entradas.findAll()) {
+            itens.add(new LancamentoFinanceiroResponse("ENT-" + e.getId(), e.getData(),
+                    e.getDescricao(), e.getCategoria(), "ENTRADA", FinanceiroRegras.valor(e.getValor()),
+                    "Recebido".equals(e.getStatus()) ? "Confirmado" : "Pendente", false,
+                    e.getFkUsuario(), e.getFkFamilia()));
+        }
         for (Despesas d : despesas.findAll()) {
             if (d.getDtDepesa() == null) continue;
             itens.add(new LancamentoFinanceiroResponse("DES-" + d.getIdDespesas(), d.getDtDepesa(),

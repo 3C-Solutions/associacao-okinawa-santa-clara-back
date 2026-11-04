@@ -16,11 +16,14 @@ public class PagamentosService {
     private final PagamentoDepartamentoRepository departamentos;
     private final AnuidadeRepository anuidades;
     private final MensalidadeRepository mensalidades;
+    private final FamiliaRepository familias;
     public PagamentosService(PagamentoRepository pagamentos, PagamentoDepartamentoRepository
                                      departamentos,
-                             AnuidadeRepository anuidades, MensalidadeRepository mensalidades) {
+                             AnuidadeRepository anuidades, MensalidadeRepository mensalidades,
+                             FamiliaRepository familias) {
         this.pagamentos = pagamentos; this.departamentos = departamentos;
         this.anuidades = anuidades; this.mensalidades = mensalidades;
+        this.familias = familias;
     }
     private Pagamento p(Integer id) { return pagamentos.findById(id).orElseThrow(() ->
             new ResponseStatusException(HttpStatus.NOT_FOUND, "Pagamento nao encontrado")); }
@@ -35,6 +38,8 @@ public class PagamentosService {
     }
     @Transactional
     public PagamentoResponse solicitar(PagamentoCreateRequest req) {
+        if (!familias.existsById(req.fkFamilia())) throw new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "Família não encontrada");
         if (!anuidades.existsById(req.fkAnuidade())) throw new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Anuidade nao encontrada");
         boolean repetido = pagamentos.findAll().stream().anyMatch(x ->

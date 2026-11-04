@@ -5,6 +5,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.Despes
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
 @RestController
@@ -18,8 +19,10 @@ public class DespesasController {
         return ResponseEntity.status(200).body(service.listar());
     }
     @PostMapping
-    public ResponseEntity<DespesasResponse> criar(@Valid @RequestBody DespesasCreateRequest dto) {
-        return ResponseEntity.status(201).body(service.criar(dto));
+    public ResponseEntity<DespesasResponse> criar(@Valid @RequestBody DespesasCreateRequest dto,
+                                                JwtAuthenticationToken authentication) {
+        Integer usuarioId = Integer.valueOf(authentication.getToken().getSubject());
+        return ResponseEntity.status(201).body(service.criar(dto, usuarioId));
     }
     @PutMapping("/{id}")
     public ResponseEntity<DespesasResponse> editar(@PathVariable Integer id,

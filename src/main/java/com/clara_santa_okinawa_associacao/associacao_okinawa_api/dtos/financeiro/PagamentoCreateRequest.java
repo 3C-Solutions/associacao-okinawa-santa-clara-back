@@ -2,7 +2,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeir
 
 import jakarta.validation.constraints.*;
 public record PagamentoCreateRequest(
-        @NotNull Integer fkFamilia,
-        @NotNull Integer fkAnuidade,
-        @NotBlank String formaPagamento
+        @NotNull @Positive Integer fkFamilia,
+        @NotNull @Positive Integer fkAnuidade,
+        @NotBlank @Size(max = 100) String formaPagamento
 ) {}

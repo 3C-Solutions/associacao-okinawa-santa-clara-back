@@ -1,5 +1,37 @@
 # API Associação Okinawa
 
+## Seleção de famílias no financeiro
+
+As consultas `GET /familias` e `GET /familias/{id}` seguem o contrato do
+`origin/develop` (dd04b15), incluindo a permissão `TELA_FAMILIAS`.
+Apenas a parte de consulta foi integrada nesta branch, preservando os módulos
+financeiros e as alterações locais. Cadastro de família/endereço não faz parte
+desta integração.
+
+Os formulários financeiros exibem nome e código das famílias cadastradas.
+Entradas e despesas mantêm a opção sem família; pagamentos de anuidade exigem
+uma família. Não há concessão automática de permissões.
+
+Execute também `database/migrations/20261104_despesa_vinculo_familia.sql` depois
+da migração de família opcional: responsável e família da despesa são vínculos
+independentes, ambos com validação por chave estrangeira.
+
+## Entradas avulsas no financeiro
+
+Execute, nesta ordem, as migrações em `database/migrations/`:
+`20261104_despesa_familia_opcional.sql` e `20261104_entradas_financeiras.sql`.
+A segunda cria `entradas_financeiras` sem alterar os pagamentos existentes.
+
+`/api/financeiro/entradas` permite GET e POST; `/{id}` permite PUT e DELETE;
+`/{id}/confirmar` permite PATCH. Todas as rotas exigem `TELA_FINANCEIRO`.
+O corpo de criação/edição recebe `data`, `descricao`, `categoria`, `valor`,
+`status` (`Pendente` ou `Recebido`) e `fkFamilia` opcional. O responsável é
+extraído do token e preservado na edição. Somente `Recebido` soma aos saldos.
+
+Para testar o ciclo completo contra um banco preparado, importe o `.env`, defina
+`FINANCE_INTEGRATION=true` e execute o teste `EntradasFinanceirasIntegrationTests`.
+Os testes são transacionais e fazem rollback, sem deixar lançamentos de teste.
+
 ## Autenticação e JWT
 
 `POST /auth/login` autentica e-mail e senha com BCrypt e retorna um JWT HS256.
@@ -232,3 +264,25 @@ Os mapeamentos de objetos individuais permanecem com o comportamento anterior.
 ```powershell
 .\mvnw.cmd "-Dtest=AutenticacaoSwaggerTests,UsuarioTesteInitializerTests" test
 ```
+
+## Dashboard financeiro
+
+As rotas `/api/financeiro/**` exigem JWT válido e a permissão `TELA_FINANCEIRO`.
+`POST /api/financeiro/despesas` identifica o responsável pelo `sub` do token;
+`fkUsuario` é opcional no payload legado e não altera o responsável. O `PUT` preserva
+esse vínculo. Famílias informadas precisam existir e ter código positivo.
+Valores de despesas devem ser positivos, com no máximo 12 dígitos inteiros e 2 decimais.
+Somente despesas pendentes podem ser confirmadas pela rota `/confirmar`.
+
+O resumo considera apenas status Pago/Confirmado, compara meses incluindo a virada
+do ano e mantém lançamentos de outros períodos para permitir filtros no cliente.
+Nenhum dado financeiro de demonstração é criado por esses endpoints.
+
+Testes sem PostgreSQL ou envio de e-mail (JDK 21):
+
+```powershell
+.\mvnw.cmd '-Dtest=FinanceiroTests,AutenticacaoSwaggerTests,UsuarioTesteInitializerTests' test
+```
+
+O teste genérico `contextLoads` continua dependendo da configuração real de banco,
+JWT e e-mail. Os testes financeiros e de autenticação usam repositórios simulados.

@@ -14,7 +14,6 @@ public final class DespesasMapper {
         despesa.setCategoria(request.categoria().trim());
         despesa.setValor(request.valor());
         despesa.setStatus(FinanceiroRegras.status(request.status()));
-        despesa.setFkUsuario(request.fkUsuario());
         despesa.setFkFamilia(request.fkFamilia());
         return despesa;
     }
@@ -24,7 +23,6 @@ public final class DespesasMapper {
         despesa.setCategoria(request.categoria().trim());
         despesa.setValor(request.valor());
         despesa.setStatus(FinanceiroRegras.status(request.status()));
-        despesa.setFkUsuario(request.fkUsuario());
         despesa.setFkFamilia(request.fkFamilia());
     }
     public static DespesasResponse toResponse(Despesas despesa) {

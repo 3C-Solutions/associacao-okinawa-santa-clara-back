@@ -6,10 +6,10 @@ import java.time.LocalDate;
 
 public record DespesasUpdateRequest(
         @NotNull LocalDate dtDepesa,
-        @NotBlank @Size(max = 200) String descricao,
+        @NotBlank @Size(min = 3, max = 200) String descricao,
         @NotBlank @Size(max = 100) String categoria,
-        @NotNull @DecimalMin("0.01") BigDecimal valor,
+        @NotNull @DecimalMin("0.01") @Digits(integer = 12, fraction = 2) BigDecimal valor,
         @NotBlank String status,
-        @NotNull Integer fkUsuario,
-        Integer fkFamilia
+        @Positive Integer fkUsuario,
+        @Positive Integer fkFamilia
 ) {}
