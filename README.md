@@ -331,3 +331,52 @@ Testes sem PostgreSQL ou envio de e-mail (JDK 21):
 
 O teste genérico `contextLoads` continua dependendo da configuração real de banco,
 JWT e e-mail. Os testes financeiros e de autenticação usam repositórios simulados.
+
+## Configurações da própria conta
+
+Os endpoints abaixo exigem apenas autenticação válida, sem permissão administrativa.
+O ID utilizado em todas as operações vem exclusivamente do `sub` do JWT.
+
+| Endpoint | Comportamento |
+| --- | --- |
+| `GET /minha-conta` | Retorna `id`, `nome`, `email`, `telefone`, `dataNascimento`, `funcaoSistema` e `familia` com endereço. |
+| `PUT /minha-conta` | Atualiza somente nome, e-mail e telefone. |
+| `PUT /minha-conta/senha` | Confere a senha atual, grava a nova com BCrypt e retorna `204`, sem corpo. |
+
+Atualização dos dados pessoais:
+
+```json
+{"nome":"João Silva","email":"joao@example.com","telefone":"11999999999"}
+```
+
+Para alterar o e-mail, incluir `senhaAtual`. O nome deve ter de 3 a 255 caracteres,
+o e-mail deve ser válido e ter até 255, e o telefone é opcional, com até 20 caracteres.
+Nome, e-mail e telefone são normalizados; senha não recebe trim nem normalização.
+E-mail de outra conta gera `409`; o índice único existente também protege a gravação.
+Função, situação, nascimento e vínculos familiares não são editáveis nesses endpoints.
+
+Troca de senha:
+
+```json
+{"senhaAtual":"SenhaAtual123!","novaSenha":"NovaSenha123!"}
+```
+
+A senha atual pode ser a provisória de seis caracteres. A nova precisa de pelo menos
+oito caracteres, até 72 bytes em UTF-8, e deve ser diferente da atual. Senha atual
+incorreta retorna `400` com `codigo: "SENHA_ATUAL_INCORRETA"`, preservando a sessão.
+Os códigos `NOVA_SENHA_IGUAL` e `NOVA_SENHA_LONGA` também retornam `400`.
+Validações de DTO seguem o formato de erro existente. Nenhum endpoint devolve senha ou hash.
+
+Dados inválidos retornam `400`; sessão inválida, usuário removido, inativo ou sem função
+retornam `401`. A resposta de perfil mantém família/endereço apenas para consulta.
+Não há preferência de notificações ou atualização de endereço nesta entrega.
+
+Após trocar a senha, o front encerra a sessão do navegador atual e solicita novo login.
+Os JWTs já emitidos continuam válidos até expirar; não foi acrescentado controle de versão
+nem revogação global. O `/auth/me` mantém seu contrato e é recarregado após editar o perfil.
+
+`AutenticacaoSwaggerTests` verifica os novos contratos com serviço real e repositório
+simulado: isolamento por JWT, acesso sem permissões de telas, proteção de campos,
+conflito de e-mail, troca de login, comparação BCrypt e validações de senha. Não usa
+PostgreSQL nem envia e-mails. A configuração do teste também corrige a lista de imports
+que estava quebrada após o merge das funcionalidades financeiras e de famílias.
