@@ -229,6 +229,51 @@ seus usuários autenticados, com a lista de permissões vazia.
 `GET /usuarios` agora retorna `200` com `[]` quando não há usuários, em vez de `null`.
 Os mapeamentos de objetos individuais permanecem com o comportamento anterior.
 
+## Integração de famílias
+
+Todos os endpoints de `/familias` exigem JWT e `TELA_FAMILIAS`:
+
+| Método e caminho | Resposta |
+| --- | --- |
+| `GET /familias` | `200` com lista ordenada por nome e ID; vazia retorna `[]`. |
+| `GET /familias/{id}` | `200` com família e endereço; `404` quando não existe. |
+| `POST /familias/com-endereco` | `201` com família e endereço criados na mesma transação. |
+| `POST /familias` | Mantém o cadastro com `{ nome, fkEndereco }` para endereço existente. |
+
+Exemplo de cadastro conjunto:
+
+```json
+{
+  "nome": "Takara",
+  "endereco": {
+    "rua": "Rua das Flores",
+    "numero": "245",
+    "complemento": null,
+    "bairro": "Liberdade",
+    "cidade": "São Paulo",
+    "uf": "SP",
+    "cep": "01504-001"
+  }
+}
+```
+
+O nome tem de 2 a 255 caracteres após remover espaços externos. O endereço é obrigatório,
+com `rua` preenchida; os demais campos seguem as validações de `EnderecoRequest`.
+Nome e endereço são normalizados, campos opcionais vazios ficam nulos e UF fica em
+maiúsculas. Falhas na persistência de qualquer entidade desfazem a transação conjunta.
+Esse fluxo exige apenas `TELA_FAMILIAS`; `POST /enderecos` mantém `TELA_ENDERECOS`.
+Dados inválidos retornam `400`, token ausente/inválido retorna `401` e falta de permissão,
+`403`. A resposta continua `{ id, nome, endereco }`, sem responsável ou composição familiar.
+
+A funcionalidade de código exato `TELA_FAMILIAS` deve existir no catálogo e ser atribuída
+às funções autorizadas. Esta entrega não insere nem concede permissões no banco.
+Não há endpoints de edição ou exclusão de famílias nesta etapa.
+
+Verificação sem banco externo: `FamiliaServiceTests` cobre consulta, compatibilidade do
+cadastro anterior e commit/rollback por proxy transacional com persistência simulada.
+`AutenticacaoSwaggerTests` cobre os contratos HTTP, validações e permissões.
+Esses testes não substituem uma validação de persistência no PostgreSQL do ambiente.
+
 ```powershell
 .\mvnw.cmd "-Dtest=AutenticacaoSwaggerTests,UsuarioTesteInitializerTests" test
 ```
