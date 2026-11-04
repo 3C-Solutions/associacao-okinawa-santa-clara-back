@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/enderecos")
-@PreAuthorize("hasAuthority('TELA_FAMILIAS')")
+@PreAuthorize("hasAuthority('TELA_ENDERECOS')")
 @Tag(name = "Endereços", description = "Cadastro de endereços de famílias")
 public class EnderecoController {
 
