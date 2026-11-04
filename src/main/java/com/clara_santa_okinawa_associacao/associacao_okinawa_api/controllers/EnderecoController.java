@@ -33,14 +33,16 @@ public class EnderecoController {
 
     @PostMapping
     @Operation(summary = "Cadastro de endereço",
-            description = "Cadastra um endereço para ser vinculado a uma família. Exige autenticação JWT e TELA_FAMILIAS.")
+            description = "Cadastra um endereço para ser vinculado a uma família. Exige " +
+                    "autenticação JWT e TELA_ENDERECOS.")
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Endereço cadastrado com sucesso",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = EnderecoResponse.class))),
             @ApiResponse(responseCode = "400", description = "Campos inválidos, corpo ausente ou JSON inválido",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = ErrorResponseDTO.class))),
             @ApiResponse(responseCode = "401", description = "Autenticação ausente ou inválida", content = @Content),
-            @ApiResponse(responseCode = "403", description = "Usuário sem a permissão TELA_FAMILIAS", content = @Content)
+            @ApiResponse(responseCode = "403", description = "Usuário sem a permissão " +
+                    "TELA_ENDERECOS", content = @Content)
     })
     public ResponseEntity<EnderecoResponse> cadastrar(@Valid @RequestBody EnderecoRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(enderecoService.cadastrar(request));
