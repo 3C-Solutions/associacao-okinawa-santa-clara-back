@@ -5,6 +5,15 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.JwtConf
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.OpenApiConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.SecurityConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.AuthController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FamiliaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.EnderecoController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FamiliaService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.EnderecoService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.EmailService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.familia.FamiliaComEnderecoRequest;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.familia.FamiliaResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.endereco.EnderecoResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.NotExistsByIdException;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FuncionalidadeSistemaController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FuncionalidadeSistemaService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncionalidadeSistemaRepository;
@@ -88,6 +97,7 @@ class AutenticacaoSwaggerTests {
     @EnableAutoConfiguration(excludeName = {
             "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration",
             "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
+            "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration",
             "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
             "org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration"
     })
@@ -96,6 +106,7 @@ class AutenticacaoSwaggerTests {
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class,
             DespesasController.class, FinanceiroDashboardController.class})
+            FamiliaController.class, EnderecoController.class})
     static class TestConfig {
     }
 
@@ -115,6 +126,10 @@ class AutenticacaoSwaggerTests {
     private FuncaoSistemaService funcaoSistemaService;
     @MockitoBean
     private FuncionalidadeSistemaRepository funcionalidadeSistemaRepository;
+    @MockitoBean
+    private FamiliaService familiaService;
+    @MockitoBean
+    private EnderecoService enderecoService;
 
     private Usuario usuario;
 
@@ -714,6 +729,78 @@ class AutenticacaoSwaggerTests {
         when(usuarioService.listar()).thenAnswer(invocacao -> servico.listar());
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
                 .andExpect(status().isOk()).andExpect(content().json("[]"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/familias", "/familias/1"})
+    void consultasFamiliaExigemPermissaoEspecifica(String caminho) throws Exception {
+        mvc.perform(get(caminho)).andExpect(status().isUnauthorized());
+        mvc.perform(get(caminho).header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(familiaService);
+    }
+
+    @Test
+    void listaFamiliasVaziaEDetalheInexistente() throws Exception {
+        adicionarPermissao(usuario, "TELA_FAMILIAS");
+        when(familiaService.listar()).thenReturn(List.of());
+        when(familiaService.buscarPorId(9)).thenThrow(new NotExistsByIdException("Família não encontrada: 9"));
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(get("/familias").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(content().json("[]"));
+        mvc.perform(get("/familias/9").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound()).andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void cadastroConjuntoEConsultasExigemApenasPermissaoFamilias() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        adicionarPermissao(usuario, "TELA_FAMILIAS");
+        FamiliaResponse resposta = new FamiliaResponse(7, "Takara", new EnderecoResponse(
+                8, "Rua das Flores", null, "São Paulo", "10", "SP", "01504-001", null));
+        when(familiaService.cadastrarComEndereco(any())).thenReturn(resposta);
+        when(familiaService.listar()).thenReturn(List.of(resposta));
+        when(familiaService.buscarPorId(7)).thenReturn(resposta);
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua das Flores\"}}"))
+                .andExpect(status().isCreated()).andExpect(jsonPath("$.id").value(7))
+                .andExpect(jsonPath("$.endereco.id").value(8));
+        mvc.perform(get("/familias").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].nome").value("Takara"));
+        mvc.perform(get("/familias/7").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.endereco.cidade").value("São Paulo"));
+        mvc.perform(post("/enderecos").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"rua\":\"Rua das Flores\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(enderecoService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"TELA_USUARIOS", "TELA_ENDERECOS"})
+    void outrasPermissoesNaoAutorizamCadastroFamilia(String permissao) throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        adicionarPermissao(usuario, permissao);
+        String corpo = "{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua das Flores\"}}";
+        mvc.perform(post("/familias/com-endereco").contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(familiaService);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"nome\":\"Takara\"}", "{\"nome\":\"  a  \",\"endereco\":{\"rua\":\"Rua A\"}}",
+            "{\"nome\":\"Takara\",\"endereco\":{}}", "{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua A\",\"uf\":\"SSP\"}}",
+            "{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua A\",\"cep\":\"123\"}}"})
+    void cadastroFamiliaValidaNomeEEnderecoAninhado(String corpo) throws Exception {
+        adicionarPermissao(usuario, "TELA_FAMILIAS");
+        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(familiaService);
     }
 
     private void adicionarPermissao(Usuario usuario, String codigo) {
