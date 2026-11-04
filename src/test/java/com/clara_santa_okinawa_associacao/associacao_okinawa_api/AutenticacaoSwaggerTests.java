@@ -33,6 +33,12 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.Glob
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioAutenticadoService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.AuthService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.EmailService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.DespesasService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FinanceiroDashboardService;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.DespesasController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FinanceiroDashboardController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.DespesasCreateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.TokenService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioDetailsService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioService;
@@ -71,6 +77,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -88,6 +95,7 @@ class AutenticacaoSwaggerTests {
     @Configuration(proxyBeanMethods = false)
     @TestComponent
     @EnableAutoConfiguration(excludeName = {
+            "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration",
             "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration",
             "org.springframework.boot.mail.autoconfigure.MailSenderAutoConfiguration",
             "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration",
@@ -97,6 +105,7 @@ class AutenticacaoSwaggerTests {
             PermissoesJwtConverter.class, AuthController.class, UsuarioController.class, FuncaoSistemaController.class,
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class,
+            DespesasController.class, FinanceiroDashboardController.class})
             FamiliaController.class, EnderecoController.class})
     static class TestConfig {
     }
@@ -123,6 +132,41 @@ class AutenticacaoSwaggerTests {
     private EnderecoService enderecoService;
 
     private Usuario usuario;
+
+    @MockitoBean
+    private DespesasService despesasService;
+    @MockitoBean
+    private FinanceiroDashboardService financeiroService;
+
+    @Test
+    void financeiroExigeAutenticacaoEPermissao() throws Exception {
+        mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11")
+                .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(financeiroService);
+    }
+
+    @Test
+    void despesaUsaIdDoTokenERejeitaValorComMaisDeDuasCasas() throws Exception {
+        adicionarPermissao(usuario, "TELA_FINANCEIRO");
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(post("/api/financeiro/despesas").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"dtDepesa":"2026-11-03","descricao":"Materiais","categoria":"Outros","valor":12.50,"status":"Pago","fkUsuario":999}
+                    """))
+                .andExpect(status().isCreated());
+        verify(despesasService).criar(any(DespesasCreateRequest.class), eq(1));
+        mvc.perform(post("/api/financeiro/despesas").header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"dtDepesa":"2026-11-03","descricao":"Materiais","categoria":"Outros","valor":12.501,"status":"Pago"}
+                    """))
+                .andExpect(status().isBadRequest());
+        verify(despesasService, times(1)).criar(any(), eq(1));
+    }
 
     @BeforeEach
     void prepararUsuario() {
