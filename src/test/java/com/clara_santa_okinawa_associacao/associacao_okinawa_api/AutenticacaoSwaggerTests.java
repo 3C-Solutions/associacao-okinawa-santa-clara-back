@@ -75,6 +75,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.aMapWithSize;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -84,6 +87,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(classes = AutenticacaoSwaggerTests.TestConfig.class, properties = {
@@ -948,5 +952,54 @@ class AutenticacaoSwaggerTests {
         FuncionalidadeSistema permissao = new FuncionalidadeSistema();
         permissao.setCodigo(codigo);
         usuario.getFuncaoSistema().getFuncionalidades().add(permissao);
+    }
+
+    @Test
+    void exclusaoInativaUsuarioSemApagarERevogaAcesso() throws Exception {
+        Usuario alvo = new Usuario();
+        alvo.setId(5);
+        alvo.setNome("Maria");
+        alvo.setEmail("maria@example.com");
+        alvo.setAtivo(true);
+        alvo.setFuncaoSistema(usuario.getFuncaoSistema());
+        when(usuarioRepository.findById(5)).thenReturn(Optional.of(alvo));
+        when(usuarioRepository.buscarComPermissoes(5)).thenReturn(Optional.of(alvo));
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class),
+                mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
+        doAnswer(invocacao -> { servico.excluir(invocacao.getArgument(0), invocacao.getArgument(1)); return null; })
+                .when(usuarioService).excluir(any(), any());
+        String token = tokenService.gerarToken(1).accesToken();
+
+        mvc.perform(delete("/usuarios/5").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        assertFalse(alvo.isAtivo());
+        verify(usuarioRepository).save(alvo);
+        verify(usuarioRepository, never()).deleteById(any());
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + tokenService.gerarToken(5).accesToken()))
+                .andExpect(status().isUnauthorized());
+
+        // Repetir a exclusão é idempotente.
+        mvc.perform(delete("/usuarios/5").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNoContent());
+        verify(usuarioRepository, times(1)).save(alvo);
+    }
+
+    @Test
+    void exclusaoDaPropriaContaRetorna409EInexistenteRetorna404() throws Exception {
+        when(usuarioRepository.findById(1)).thenReturn(Optional.of(usuario));
+        when(usuarioRepository.findById(99)).thenReturn(Optional.empty());
+        UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class),
+                mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
+        doAnswer(invocacao -> { servico.excluir(invocacao.getArgument(0), invocacao.getArgument(1)); return null; })
+                .when(usuarioService).excluir(any(), any());
+        String token = tokenService.gerarToken(1).accesToken();
+
+        mvc.perform(delete("/usuarios/1").header("Authorization", "Bearer " + token))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.mensagem").value("Não é possível excluir a própria conta"));
+        assertTrue(usuario.isAtivo());
+        mvc.perform(delete("/usuarios/99").header("Authorization", "Bearer " + token))
+                .andExpect(status().isNotFound());
+        verify(usuarioRepository, never()).save(any());
     }
 }
