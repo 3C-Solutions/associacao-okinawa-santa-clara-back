@@ -11,6 +11,7 @@ import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
     Boolean existsByEmail(String email);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
 
     Optional<Usuario> findByEmail(String email);
 

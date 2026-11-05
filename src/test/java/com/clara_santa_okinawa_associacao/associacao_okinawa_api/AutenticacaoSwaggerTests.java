@@ -5,6 +5,8 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.JwtConf
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.OpenApiConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.SecurityConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.AuthController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.MinhaContaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.MinhaContaService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FamiliaController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.EnderecoController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FamiliaService;
@@ -110,7 +112,7 @@ class AutenticacaoSwaggerTests {
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class,
             DespesasController.class, FinanceiroDashboardController.class,
-            FamiliaController.class, EnderecoController.class})
+            FamiliaController.class, EnderecoController.class, MinhaContaController.class, MinhaContaService.class})
     static class TestConfig {
     }
 
@@ -805,6 +807,145 @@ class AutenticacaoSwaggerTests {
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(familiaService);
+    }
+
+    @Test
+    void minhaContaSemPermissoesConsultaSomentePropriosDadosSemSenha() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(get("/minha-conta")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/minha-conta").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.nome").value(usuario.getNome()))
+                .andExpect(jsonPath("$.funcaoSistema.id").value(2))
+                .andExpect(jsonPath("$.senha").doesNotExist()).andExpect(jsonPath("$.senhaAtual").doesNotExist());
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token)).andExpect(status().isForbidden());
+    }
+
+    @Test
+    void atualizacaoPropriaIgnoraIdsFuncaoESituacaoEnviadosNoCorpo() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"id":999,"nome":"  Nome atualizado  ","email":" TESTE@EXAMPLE.COM ","telefone":"11999999999",
+                                 "idFuncaoSistema":999,"ativo":false,"idFamilia":999}
+                                """))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.nome").value("Nome atualizado"))
+                .andExpect(jsonPath("$.email").value("teste@example.com"))
+                .andExpect(jsonPath("$.funcaoSistema.id").value(2));
+        org.junit.jupiter.api.Assertions.assertTrue(usuario.isAtivo());
+        org.junit.jupiter.api.Assertions.assertNull(usuario.getFamilia());
+        verify(usuarioRepository, never()).buscarComPermissoes(999);
+        verify(usuarioRepository, never()).findById(999);
+    }
+
+    @Test
+    void emailNovoExigeSenhaAtualEConflitoNaoModificaConta() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"João Silva\",\"email\":\"novo@example.com\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("SENHA_ATUAL_INCORRETA"));
+        when(usuarioRepository.existsByEmailIgnoreCaseAndIdNot("novo@example.com", 1)).thenReturn(true);
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"João Silva\",\"email\":\"novo@example.com\",\"senhaAtual\":\"SenhaDeTeste123!\"}"))
+                .andExpect(status().isConflict());
+        org.junit.jupiter.api.Assertions.assertEquals("teste@example.com", usuario.getEmail());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void alterarEmailMantemJwtPorIdEAtualizaContextoELogin() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Nome Novo\",\"email\":\" NOVO@example.com \",\"senhaAtual\":\"SenhaDeTeste123!\"}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("novo@example.com"));
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.usuario.nome").value("Nome Novo"))
+                .andExpect(jsonPath("$.usuario.email").value("novo@example.com"));
+        when(usuarioRepository.findByEmail("teste@example.com")).thenReturn(Optional.empty());
+        when(usuarioRepository.findByEmail("novo@example.com")).thenReturn(Optional.of(usuario));
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"novo@example.com\",\"senha\":\"SenhaDeTeste123!\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"teste@example.com\",\"senha\":\"SenhaDeTeste123!\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"errada", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
+    void senhaAtualIncorretaNaoEncerraSessaoNemAlteraHash(String senhaIncorreta) throws Exception {
+        String hash = usuario.getSenha();
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"" + senhaIncorreta + "\",\"novaSenha\":\"OutraSenha123!\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("SENHA_ATUAL_INCORRETA"));
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        org.junit.jupiter.api.Assertions.assertEquals(hash, usuario.getSenha());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void senhaProvisoriaDeSeisCaracteresPodeSerTrocadaPorNovaSenha() throws Exception {
+        usuario.getFuncaoSistema().getFuncionalidades().clear();
+        usuario.setSenha(passwordEncoder.encode("ABC123"));
+        when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"ABC123\",\"novaSenha\":\"SenhaNova123!\"}"))
+                .andExpect(status().isNoContent()).andExpect(content().string(""));
+        org.junit.jupiter.api.Assertions.assertTrue(passwordEncoder.matches("SenhaNova123!", usuario.getSenha()));
+        org.junit.jupiter.api.Assertions.assertFalse(passwordEncoder.matches("ABC123", usuario.getSenha()));
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"teste@example.com\",\"senha\":\"SenhaNova123!\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"teste@example.com\",\"senha\":\"ABC123\"}"))
+                .andExpect(status().isUnauthorized());
+        // JWTs emitidos continuam válidos até expirar; o logout após a troca pertence ao front.
+        mvc.perform(get("/minha-conta").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+    }
+
+    @Test
+    void novaSenhaIgualOuMaiorQueLimiteUtf8NaoEGravada() throws Exception {
+        String token = tokenService.gerarToken(1).accesToken();
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"SenhaDeTeste123!\",\"novaSenha\":\"SenhaDeTeste123!\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("NOVA_SENHA_IGUAL"));
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"SenhaDeTeste123!\",\"novaSenha\":\"" + "á".repeat(37) + "\"}"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("NOVA_SENHA_LONGA"));
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"nome\":\"A\",\"email\":\"teste@example.com\"}", "{\"nome\":\"Nome válido\",\"email\":\"invalido\"}"})
+    void minhaContaValidaDadosPessoais(String corpo) throws Exception {
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isBadRequest());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"senhaAtual\":\"ABC123\",\"novaSenha\":\"curta\"}"})
+    void minhaContaValidaDadosDaSenha(String corpo) throws Exception {
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .contentType(MediaType.APPLICATION_JSON).content(corpo))
+                .andExpect(status().isBadRequest());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"/minha-conta", "/minha-conta/senha"})
+    void atualizarMinhaContaExigeJwt(String caminho) throws Exception {
+        mvc.perform(put(caminho).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isUnauthorized());
     }
 
     private void adicionarPermissao(Usuario usuario, String codigo) {
