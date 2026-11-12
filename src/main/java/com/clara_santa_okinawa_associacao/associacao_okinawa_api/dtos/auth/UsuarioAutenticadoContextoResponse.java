@@ -10,6 +10,9 @@ public record UsuarioAutenticadoContextoResponse(
 
         @Schema(description = "Códigos das permissões de acesso às telas concedidas à função do usuário, únicos e em ordem alfabética; lista vazia quando não há acessos",
                 example = "[\"TELA_USUARIOS\"]")
-        List<String> permissoes
+        List<String> permissoes,
+
+        @Schema(description = "Indica que a troca de senha é obrigatória antes de acessar o sistema")
+        boolean primeiroAcesso
 ) {
 }

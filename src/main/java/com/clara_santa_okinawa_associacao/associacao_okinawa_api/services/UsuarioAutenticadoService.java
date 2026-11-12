@@ -1,6 +1,7 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.UsuarioAutenticadoContextoResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.UsuarioAutenticadoResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.FuncionalidadeSistema;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Usuario;
@@ -23,11 +24,11 @@ public class UsuarioAutenticadoService {
     }
 
     @Transactional(readOnly = true)
-    public UsuarioAutenticadoContextoResponse consultar(Integer usuarioId) {
+    public UsuarioAutenticadoContextoResponse consultar(Integer usuarioId, boolean primeiroAcesso) {
         Usuario usuario = usuarioRepository.buscarComPermissoes(usuarioId)
                 .orElseThrow(this::usuarioSemAcesso);
 
-        if (!usuario.isAtivo() || usuario.getFuncaoSistema() == null) {
+        if (!usuario.isAtivo() || usuario.getFuncaoSistema() == null || usuario.isPrimeiroAcesso() != primeiroAcesso) {
             throw usuarioSemAcesso();
         }
 
@@ -38,13 +39,14 @@ public class UsuarioAutenticadoService {
                 FuncaoSistemaMapper.toResponse(usuario.getFuncaoSistema())
         );
 
-        List<String> permissoes = usuario.getFuncaoSistema().getFuncionalidades().stream()
+        List<String> permissoes = primeiroAcesso ? List.of() : usuario.getFuncaoSistema().getFuncionalidades().stream()
                 .map(FuncionalidadeSistema::getCodigo)
+                .filter(codigo -> !FinalidadeToken.autoridadeReservada(codigo))
                 .distinct()
                 .sorted()
                 .toList();
 
-        return new UsuarioAutenticadoContextoResponse(identificacao, permissoes);
+        return new UsuarioAutenticadoContextoResponse(identificacao, permissoes, primeiroAcesso);
     }
 
     private ResponseStatusException usuarioSemAcesso() {

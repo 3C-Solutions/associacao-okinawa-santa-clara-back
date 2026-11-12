@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import static com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken.ACESSO;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -32,7 +33,7 @@ class EntradasFinanceirasIntegrationTests {
     }
     private RequestPostProcessor autorizado() {
         return jwt().jwt(j -> j.subject(usuarioId().toString()))
-                .authorities(new SimpleGrantedAuthority("TELA_FINANCEIRO"));
+                .authorities(new SimpleGrantedAuthority(ACESSO.autoridade()), new SimpleGrantedAuthority("TELA_FINANCEIRO"));
     }
     private String dados(String status, String valor) {
         return """
@@ -84,7 +85,8 @@ class EntradasFinanceirasIntegrationTests {
     @Test
     void exigeAutenticacaoEPermissaoFinanceira() throws Exception {
         mvc.perform(get(URL)).andExpect(status().isUnauthorized());
-        mvc.perform(post(URL).with(jwt().authorities(new SimpleGrantedAuthority("TELA_USUARIOS")))
+        mvc.perform(post(URL).with(jwt().authorities(new SimpleGrantedAuthority(ACESSO.autoridade()),
+                        new SimpleGrantedAuthority("TELA_USUARIOS")))
                 .contentType("application/json").content(dados("Recebido", "1.00")))
                 .andExpect(status().isForbidden());
     }
@@ -93,13 +95,13 @@ class EntradasFinanceirasIntegrationTests {
         mvc.perform(get("/familias")).andExpect(status().isUnauthorized());
         mvc.perform(get("/familias").with(autorizado())).andExpect(status().isForbidden());
         String json = mvc.perform(get("/familias").with(jwt()
-                .authorities(new SimpleGrantedAuthority("TELA_FAMILIAS"))))
+                .authorities(new SimpleGrantedAuthority(ACESSO.autoridade()), new SimpleGrantedAuthority("TELA_FAMILIAS"))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
         java.util.List<Integer> ids = JsonPath.read(json, "$[*].id");
         assertEquals(jdbc.queryForList("select id from public.familia order by nome,id", Integer.class), ids);
         if (!ids.isEmpty()) {
             mvc.perform(get("/familias/" + ids.get(0)).with(jwt()
-                    .authorities(new SimpleGrantedAuthority("TELA_FAMILIAS"))))
+                    .authorities(new SimpleGrantedAuthority(ACESSO.autoridade()), new SimpleGrantedAuthority("TELA_FAMILIAS"))))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(ids.get(0)))
                     .andExpect(jsonPath("$.nome").isString());
         }

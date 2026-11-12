@@ -12,6 +12,9 @@ public record LoginResponse(
         String tokenType,
 
         @Schema(description = "Tempo de validade do token em segundos", example = "900")
-        long expiresIn
+        long expiresIn,
+
+        @Schema(description = "Indica que a troca de senha é obrigatória antes de acessar o sistema")
+        boolean primeiroAcesso
 ) {
 }

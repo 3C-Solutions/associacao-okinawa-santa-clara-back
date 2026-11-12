@@ -7,7 +7,6 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -16,6 +15,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+
+import static com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken.ACESSO;
+import static com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken.PRIMEIRO_ACESSO;
 
 @Configuration
 @EnableWebSecurity
@@ -33,7 +35,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
-                        .anyRequest().authenticated()
+                        .requestMatchers(HttpMethod.GET, "/auth/me")
+                        .hasAnyAuthority(ACESSO.autoridade(), PRIMEIRO_ACESSO.autoridade())
+                        .requestMatchers(HttpMethod.PUT, "/minha-conta/senha")
+                        .hasAnyAuthority(ACESSO.autoridade(), PRIMEIRO_ACESSO.autoridade())
+                        .anyRequest().hasAuthority(ACESSO.autoridade())
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(permissoesJwtConverter)));

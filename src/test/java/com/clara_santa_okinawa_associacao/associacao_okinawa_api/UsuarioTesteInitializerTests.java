@@ -84,6 +84,7 @@ class UsuarioTesteInitializerTests {
         assertEquals("swagger@example.com", usuario.getEmail());
         assertEquals("hash-bcrypt", usuario.getSenha());
         assertTrue(usuario.isAtivo());
+        assertTrue(usuario.isPrimeiroAcesso());
         assertNotNull(usuario.getDataCriacao());
         assertNotNull(usuario.getTelefone());
         assertFalse(usuario.getTelefone().isBlank());
