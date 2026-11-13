@@ -1,5 +1,6 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.auth.LoginResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
@@ -30,7 +31,7 @@ public class TokenService {
         this.expirationMinutes = expirationMinutes;
     }
 
-    public LoginResponse gerarToken(Integer usuarioId) {
+    public LoginResponse gerarToken(Integer usuarioId, boolean primeiroAcesso) {
         Instant agora = Instant.now();
         Instant expiracao = agora.plus(
                 expirationMinutes, ChronoUnit.MINUTES
@@ -39,6 +40,7 @@ public class TokenService {
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuer(issuer)
                 .subject(usuarioId.toString())
+                .claim(FinalidadeToken.CLAIM, FinalidadeToken.de(primeiroAcesso).name())
                 .issuedAt(agora)
                 .expiresAt(expiracao)
                 .build();
@@ -54,7 +56,8 @@ public class TokenService {
         return new LoginResponse(
                 token,
                 "Bearer",
-                Duration.between(agora, expiracao).toSeconds()
+                Duration.between(agora, expiracao).toSeconds(),
+                primeiroAcesso
         );
     }
 }

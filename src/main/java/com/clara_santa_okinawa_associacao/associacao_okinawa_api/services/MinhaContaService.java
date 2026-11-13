@@ -57,6 +57,7 @@ public class MinhaContaService {
             throw new MinhaContaValidacaoException("NOVA_SENHA_IGUAL", "A nova senha deve ser diferente da atual.");
         }
         usuario.setSenha(encoder.encode(dados.novaSenha()));
+        usuario.concluirPrimeiroAcesso();
         usuarios.saveAndFlush(usuario);
     }
 

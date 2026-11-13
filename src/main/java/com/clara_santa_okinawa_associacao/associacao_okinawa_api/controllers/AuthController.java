@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import static com.clara_santa_okinawa_associacao.associacao_okinawa_api.components.FinalidadeToken.PRIMEIRO_ACESSO;
+
 @RestController
 @RequestMapping("/auth")
 @Tag(
@@ -41,7 +43,7 @@ public class AuthController {
     @GetMapping("/me")
     @Operation(
             summary = "Consulta do usuário autenticado e seus acessos",
-            description = "Retorna identificação, função e permissões do usuário identificado pelo token. Cada permissão corresponde ao acesso a uma tela. Os códigos são únicos e ordenados alfabeticamente. Exige apenas autenticação válida."
+            description = "Retorna identificação, função e permissões do usuário. No primeiro acesso, indica a troca obrigatória e retorna permissões vazias."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuário e acessos atuais; lista de permissões vazia quando não há acessos",
@@ -52,12 +54,12 @@ public class AuthController {
     })
     public ResponseEntity<UsuarioAutenticadoContextoResponse> consultarUsuarioAutenticado(JwtAuthenticationToken authentication) {
         Integer usuarioId = Integer.valueOf(authentication.getToken().getSubject());
-        return ResponseEntity.ok(usuarioAutenticadoService.consultar(usuarioId));
+        return ResponseEntity.ok(usuarioAutenticadoService.consultar(usuarioId, PRIMEIRO_ACESSO.corresponde(authentication.getToken())));
     }
 
     @Operation(
             summary = "Autenticação de um usuário",
-            description = "Autentica um usuário pelo e-mail e senha e retorna um token JWT para acesso ao sistema"
+            description = "Autentica por e-mail e senha. No primeiro acesso, o JWT permite consultar /auth/me e trocar a senha em PUT /minha-conta/senha."
     )
     @ApiResponses({
             @ApiResponse(

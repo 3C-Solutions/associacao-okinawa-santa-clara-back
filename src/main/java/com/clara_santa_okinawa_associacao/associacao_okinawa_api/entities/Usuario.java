@@ -2,6 +2,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,6 +23,10 @@ public class Usuario {
     private String email;
 
     private String senha;
+
+    @Column(name = "primeiro_acesso", nullable = false, insertable = false)
+    @ColumnDefault("true")
+    private Boolean primeiroAcesso = true;
 
     private String telefone;
 
@@ -75,6 +80,14 @@ public class Usuario {
 
     public void setSenha(String senha) {
         this.senha = senha;
+    }
+
+    public boolean isPrimeiroAcesso() {
+        return !Boolean.FALSE.equals(primeiroAcesso);
+    }
+
+    public void concluirPrimeiroAcesso() {
+        primeiroAcesso = false;
     }
 
     public String getTelefone() {

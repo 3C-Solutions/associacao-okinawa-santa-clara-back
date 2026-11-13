@@ -18,7 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/minha-conta")
-@Tag(name = "Minha conta", description = "Dados e senha do próprio usuário; exige apenas autenticação válida")
+@Tag(name = "Minha conta", description = "Dados e senha do próprio usuário")
 public class MinhaContaController {
     private final MinhaContaService servico;
 
@@ -48,7 +48,7 @@ public class MinhaContaController {
     @ApiResponses({@ApiResponse(responseCode = "204", description = "Senha alterada; resposta sem corpo"),
             @ApiResponse(responseCode = "400", description = "Senha atual incorreta ou nova senha inválida"),
             @ApiResponse(responseCode = "401", description = "Sessão inválida ou conta sem acesso")})
-    @Operation(summary = "Alterar minha senha", description = "Confere a senha atual e grava a nova com BCrypt. Não revoga JWTs já emitidos; o front solicita novo login no navegador atual.")
+    @Operation(summary = "Alterar minha senha", description = "Confere a senha atual e grava a nova com BCrypt. A troca no primeiro acesso encerra a pendência e invalida os tokens provisórios. Faça login com a nova senha.")
     public ResponseEntity<Void> alterarSenha(JwtAuthenticationToken autenticacao, @Valid @RequestBody MinhaContaSenhaRequest dados) {
         servico.alterarSenha(id(autenticacao), dados);
         return ResponseEntity.noContent().build();

@@ -149,7 +149,7 @@ class AutenticacaoSwaggerTests {
         mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/api/financeiro/dashboard?ano=2026&mes=11")
-                .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(financeiroService);
     }
@@ -157,7 +157,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void despesaUsaIdDoTokenERejeitaValorComMaisDeDuasCasas() throws Exception {
         adicionarPermissao(usuario, "TELA_FINANCEIRO");
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(post("/api/financeiro/despesas").header("Authorization", "Bearer " + token)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -176,6 +176,10 @@ class AutenticacaoSwaggerTests {
 
     @BeforeEach
     void prepararUsuario() {
+        prepararUsuario(false);
+    }
+
+    private void prepararUsuario(boolean primeiroAcesso) {
         FuncionalidadeSistema permissao = new FuncionalidadeSistema();
         permissao.setCodigo("TELA_USUARIOS");
         FuncaoSistema funcao = new FuncaoSistema();
@@ -189,6 +193,9 @@ class AutenticacaoSwaggerTests {
         usuario.setEmail("teste@example.com");
         usuario.setSenha(passwordEncoder.encode("SenhaDeTeste123!"));
         usuario.setAtivo(true);
+        if (!primeiroAcesso) {
+            usuario.concluirPrimeiroAcesso();
+        }
         usuario.setFuncaoSistema(funcao);
         when(usuarioRepository.findByEmail(usuario.getEmail())).thenReturn(Optional.of(usuario));
         when(usuarioRepository.buscarComPermissoes(1)).thenReturn(Optional.of(usuario));
@@ -205,7 +212,7 @@ class AutenticacaoSwaggerTests {
                 .andExpect(jsonPath("$.paths['/auth/me'].get.responses['200'].content['application/json'].schema['$ref']")
                         .value("#/components/schemas/UsuarioAutenticadoContextoResponse"))
                 .andExpect(jsonPath("$.paths['/auth/me'].get.security").doesNotExist())
-                .andExpect(jsonPath("$.components.schemas.UsuarioAutenticadoContextoResponse.properties", aMapWithSize(2)))
+                .andExpect(jsonPath("$.components.schemas.UsuarioAutenticadoContextoResponse.properties", aMapWithSize(3)))
                 .andExpect(jsonPath("$.components.schemas.UsuarioAutenticadoContextoResponse.properties.permissoes.type").value("array"))
                 .andExpect(jsonPath("$.components.schemas.UsuarioAutenticadoContextoResponse.properties.telas").doesNotExist())
                 .andExpect(jsonPath("$.paths['/auth/acessos']").doesNotExist())
@@ -229,7 +236,7 @@ class AutenticacaoSwaggerTests {
                 .andExpect(status().isOk());
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", aMapWithSize(2)))
+                .andExpect(jsonPath("$", aMapWithSize(3)))
                 .andExpect(jsonPath("$.telas").doesNotExist())
                 .andExpect(jsonPath("$.usuario", aMapWithSize(4)))
                 .andExpect(jsonPath("$.usuario.funcaoSistema", aMapWithSize(3)))
@@ -258,7 +265,7 @@ class AutenticacaoSwaggerTests {
         adicionarPermissao(usuario, "TELA_USUARIOS");
 
         mvc.perform(get("/auth/me")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.permissoes", hasSize(2)))
                 .andExpect(jsonPath("$.permissoes[0]").value("TELA_FUNCOES_SISTEMA"))
@@ -270,7 +277,7 @@ class AutenticacaoSwaggerTests {
         usuario.getFuncaoSistema().getFuncionalidades().clear();
 
         mvc.perform(get("/auth/me")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usuario.id").value(1))
                 .andExpect(jsonPath("$.permissoes").isEmpty());
@@ -282,7 +289,7 @@ class AutenticacaoSwaggerTests {
         adicionarPermissao(usuario, "RELATORIOS");
 
         mvc.perform(get("/auth/me")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.permissoes", hasSize(1)))
                 .andExpect(jsonPath("$.permissoes[0]").value("RELATORIOS"));
@@ -291,6 +298,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void acessosSaoDoUsuarioIdentificadoPeloToken() throws Exception {
         Usuario outroUsuario = new Usuario();
+        outroUsuario.concluirPrimeiroAcesso();
         outroUsuario.setId(2);
         outroUsuario.setNome("Outro usuário");
         outroUsuario.setEmail("outro@example.com");
@@ -300,7 +308,7 @@ class AutenticacaoSwaggerTests {
         when(usuarioRepository.buscarComPermissoes(2)).thenReturn(Optional.of(outroUsuario));
 
         mvc.perform(get("/auth/me")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(2).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(2, false).accesToken()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usuario.id").value(2))
                 .andExpect(jsonPath("$.usuario.nome").value("Outro usuário"))
@@ -312,7 +320,7 @@ class AutenticacaoSwaggerTests {
 
     @Test
     void alteracaoDeDadosEFuncaoAtualizaMeComMesmoToken() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.usuario.nome").value("João da Silva"))
@@ -343,7 +351,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void endpointAntigoDeAcessosFoiRemovido() throws Exception {
         mvc.perform(get("/auth/acessos")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isNotFound());
     }
 
@@ -351,6 +359,7 @@ class AutenticacaoSwaggerTests {
     @ValueSource(strings = {"REMOVIDO", "INATIVO", "SEM_FUNCAO"})
     void revogacaoEntreAutenticacaoEConsultaRetorna401(String motivo) throws Exception {
         Usuario usuarioRevogado = new Usuario();
+        usuarioRevogado.concluirPrimeiroAcesso();
         usuarioRevogado.setAtivo(!motivo.equals("INATIVO"));
         usuarioRevogado.setFuncaoSistema(motivo.equals("SEM_FUNCAO") ? null : new FuncaoSistema());
         Optional<Usuario> resultadoConsulta = motivo.equals("REMOVIDO")
@@ -359,13 +368,13 @@ class AutenticacaoSwaggerTests {
                 .thenReturn(Optional.of(usuario), resultadoConsulta);
 
         mvc.perform(get("/auth/me")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void usuarioRemovidoNaoPodeConsultarAcessos() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         when(usuarioRepository.buscarComPermissoes(1)).thenReturn(Optional.empty());
 
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
@@ -374,7 +383,7 @@ class AutenticacaoSwaggerTests {
 
     @Test
     void usuarioSemFuncaoNaoPodeConsultarAcessos() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         usuario.setFuncaoSistema(null);
 
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
@@ -411,13 +420,17 @@ class AutenticacaoSwaggerTests {
                 .andExpect(status().isUnauthorized());
     }
 
-    @Test
-    void tokenExpiradoRetorna401() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void tokenExpiradoOuSemFinalidadeRetorna401(boolean expirado) throws Exception {
         Instant agora = Instant.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder().issuer("associacao-api").subject("1")
-                .issuedAt(agora.minusSeconds(1800)).expiresAt(agora.minusSeconds(300)).build();
+        var claims = JwtClaimsSet.builder().issuer("associacao-api").subject("1")
+                .issuedAt(agora.minusSeconds(1800)).expiresAt(agora.plusSeconds(expirado ? -300 : 300));
+        if (expirado) {
+            claims.claim("finalidade", "ACESSO");
+        }
         String token = jwtEncoder.encode(JwtEncoderParameters.from(
-                JwsHeader.with(MacAlgorithm.HS256).build(), claims)).getTokenValue();
+                JwsHeader.with(MacAlgorithm.HS256).build(), claims.build())).getTokenValue();
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
         mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
@@ -427,13 +440,13 @@ class AutenticacaoSwaggerTests {
     @Test
     void usuarioSemPermissaoRetorna403() throws Exception {
         usuario.getFuncaoSistema().getFuncionalidades().clear();
-        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
     void desativacaoRevogaAcessoMesmoComTokenValido() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         usuario.setAtivo(false);
         mvc.perform(get("/usuarios").header("Authorization", "Bearer " + token))
                 .andExpect(status().isUnauthorized());
@@ -449,7 +462,7 @@ class AutenticacaoSwaggerTests {
         when(funcaoSistemaService.listar()).thenReturn(List.of(new FuncaoSistemaResponse(2, "Diretoria", "")));
         when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
                 .thenReturn(new FuncaoSistemaResponse(3, "Nova função", ""));
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         boolean consultaPermitida = !permissao.equals("OUTRA_PERMISSAO");
 
         var consulta = mvc.perform(get("/funcoes-sistema").header("Authorization", "Bearer " + token));
@@ -495,7 +508,7 @@ class AutenticacaoSwaggerTests {
         when(usuarioService.atualizar(eq(1), any(UsuarioUpdateRequest.class)))
                 .thenAnswer(invocacao -> servico.atualizar(1, invocacao.getArgument(1)));
         when(usuarioService.buscarPorId(1)).thenAnswer(invocacao -> servico.buscarPorId(1));
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
 
         mvc.perform(put("/usuarios/1").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -533,7 +546,7 @@ class AutenticacaoSwaggerTests {
 
     @Test
     void catalogoExigeGerenciamentoDeFuncoesERetornaTodosOsCodigos() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(get("/funcionalidades-sistema")).andExpect(status().isUnauthorized());
         mvc.perform(get("/funcionalidades-sistema").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
@@ -557,7 +570,7 @@ class AutenticacaoSwaggerTests {
         adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
         when(funcionalidadeSistemaRepository.findAll(Sort.by("id"))).thenReturn(List.of());
         mvc.perform(get("/funcionalidades-sistema")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isOk()).andExpect(content().json("[]"));
     }
 
@@ -569,7 +582,7 @@ class AutenticacaoSwaggerTests {
         String descricao = cenario.equals("DESCRICAO_LONGA") ? "x".repeat(256) : "Descrição";
         String ids = cenario.equals("SEM_FUNCIONALIDADES") ? "[]" : cenario.equals("ID_INVALIDO") ? "[0]" : "[7]";
         mvc.perform(post("/funcoes-sistema")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nome":"%s","descricao":"%s","idsFuncionalidades":%s}
@@ -589,7 +602,7 @@ class AutenticacaoSwaggerTests {
         when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
                 .thenAnswer(invocacao -> servico.cadastrar(invocacao.getArgument(0)));
         mvc.perform(post("/funcoes-sistema")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"nome":"  Nova função  ","idsFuncionalidades":[7]}
@@ -615,7 +628,7 @@ class AutenticacaoSwaggerTests {
         when(funcaoSistemaService.cadastrar(any(FuncaoSistemaCreateRequest.class)))
                 .thenAnswer(invocacao -> servicoFuncoes.cadastrar(invocacao.getArgument(0)));
         when(funcaoSistemaService.listar()).thenAnswer(invocacao -> servicoFuncoes.listar());
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(post("/funcoes-sistema").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -657,7 +670,7 @@ class AutenticacaoSwaggerTests {
 
     @Test
     void detalhesEEdicaoDeAcessosExigemPermissaoAdministrativa() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(get("/funcoes-sistema/2")).andExpect(status().isUnauthorized());
         mvc.perform(put("/funcoes-sistema/2/funcionalidades").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"idsFuncionalidades\":[]}"))
@@ -675,7 +688,7 @@ class AutenticacaoSwaggerTests {
         adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
         String ids = cenario.equals("LISTA_AUSENTE") ? "null" : cenario.equals("ID_INVALIDO") ? "[0]" : "[]";
         mvc.perform(put("/funcoes-sistema/2/funcionalidades")
-                        .header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+                        .header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"idsFuncionalidades":%s}
@@ -693,6 +706,7 @@ class AutenticacaoSwaggerTests {
         gerenciar.setCodigo("TELA_FUNCOES_SISTEMA");
         usuario.getFuncaoSistema().getFuncionalidades().add(gerenciar);
         Usuario outro = new Usuario();
+        outro.concluirPrimeiroAcesso();
         outro.setId(2);
         outro.setNome("Outra pessoa");
         outro.setEmail("outra@example.com");
@@ -707,8 +721,8 @@ class AutenticacaoSwaggerTests {
         when(funcaoSistemaService.buscar(2)).thenAnswer(invocacao -> servico.buscar(2));
         when(funcaoSistemaService.atualizarFuncionalidades(eq(2), any(FuncaoSistemaFuncionalidadesRequest.class)))
                 .thenAnswer(invocacao -> servico.atualizarFuncionalidades(2, invocacao.getArgument(1)));
-        String token = tokenService.gerarToken(1).accesToken();
-        String outroToken = tokenService.gerarToken(2).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
+        String outroToken = tokenService.gerarToken(2, false).accesToken();
         mvc.perform(get("/funcoes-sistema/2").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", aMapWithSize(4)))
                 .andExpect(jsonPath("$.funcionalidades[0].codigo").value("TELA_FUNCOES_SISTEMA"));
@@ -733,7 +747,7 @@ class AutenticacaoSwaggerTests {
         when(usuarioRepository.findAll()).thenReturn(List.of());
         UsuarioService servico = new UsuarioService(usuarioRepository, mock(FamiliaRepository.class), mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
         when(usuarioService.listar()).thenAnswer(invocacao -> servico.listar());
-        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isOk()).andExpect(content().json("[]"));
     }
 
@@ -741,7 +755,7 @@ class AutenticacaoSwaggerTests {
     @ValueSource(strings = {"/familias", "/familias/1"})
     void consultasFamiliaExigemPermissaoEspecifica(String caminho) throws Exception {
         mvc.perform(get(caminho)).andExpect(status().isUnauthorized());
-        mvc.perform(get(caminho).header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken()))
+        mvc.perform(get(caminho).header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(familiaService);
     }
@@ -751,7 +765,7 @@ class AutenticacaoSwaggerTests {
         adicionarPermissao(usuario, "TELA_FAMILIAS");
         when(familiaService.listar()).thenReturn(List.of());
         when(familiaService.buscarPorId(9)).thenThrow(new NotExistsByIdException("Família não encontrada: 9"));
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(get("/familias").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(content().json("[]"));
         mvc.perform(get("/familias/9").header("Authorization", "Bearer " + token))
@@ -767,7 +781,7 @@ class AutenticacaoSwaggerTests {
         when(familiaService.cadastrarComEndereco(any())).thenReturn(resposta);
         when(familiaService.listar()).thenReturn(List.of(resposta));
         when(familiaService.buscarPorId(7)).thenReturn(resposta);
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua das Flores\"}}"))
@@ -791,7 +805,7 @@ class AutenticacaoSwaggerTests {
         String corpo = "{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua das Flores\"}}";
         mvc.perform(post("/familias/com-endereco").contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isUnauthorized());
-        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isForbidden());
         verifyNoInteractions(familiaService);
@@ -803,7 +817,7 @@ class AutenticacaoSwaggerTests {
             "{\"nome\":\"Takara\",\"endereco\":{\"rua\":\"Rua A\",\"cep\":\"123\"}}"})
     void cadastroFamiliaValidaNomeEEnderecoAninhado(String corpo) throws Exception {
         adicionarPermissao(usuario, "TELA_FAMILIAS");
-        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+        mvc.perform(post("/familias/com-endereco").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(familiaService);
@@ -812,7 +826,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void minhaContaSemPermissoesConsultaSomentePropriosDadosSemSenha() throws Exception {
         usuario.getFuncaoSistema().getFuncionalidades().clear();
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(get("/minha-conta")).andExpect(status().isUnauthorized());
         mvc.perform(get("/minha-conta").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(1))
@@ -826,7 +840,7 @@ class AutenticacaoSwaggerTests {
     void atualizacaoPropriaIgnoraIdsFuncaoESituacaoEnviadosNoCorpo() throws Exception {
         usuario.getFuncaoSistema().getFuncionalidades().clear();
         when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
-        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"id":999,"nome":"  Nome atualizado  ","email":" TESTE@EXAMPLE.COM ","telefone":"11999999999",
@@ -844,7 +858,7 @@ class AutenticacaoSwaggerTests {
 
     @Test
     void emailNovoExigeSenhaAtualEConflitoNaoModificaConta() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"João Silva\",\"email\":\"novo@example.com\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("SENHA_ATUAL_INCORRETA"));
@@ -860,7 +874,7 @@ class AutenticacaoSwaggerTests {
     void alterarEmailMantemJwtPorIdEAtualizaContextoELogin() throws Exception {
         usuario.getFuncaoSistema().getFuncionalidades().clear();
         when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"nome\":\"Nome Novo\",\"email\":\" NOVO@example.com \",\"senhaAtual\":\"SenhaDeTeste123!\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.email").value("novo@example.com"));
@@ -881,7 +895,7 @@ class AutenticacaoSwaggerTests {
     @ValueSource(strings = {"errada", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"})
     void senhaAtualIncorretaNaoEncerraSessaoNemAlteraHash(String senhaIncorreta) throws Exception {
         String hash = usuario.getSenha();
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"senhaAtual\":\"" + senhaIncorreta + "\",\"novaSenha\":\"OutraSenha123!\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("SENHA_ATUAL_INCORRETA"));
@@ -891,29 +905,64 @@ class AutenticacaoSwaggerTests {
     }
 
     @Test
-    void senhaProvisoriaDeSeisCaracteresPodeSerTrocadaPorNovaSenha() throws Exception {
-        usuario.getFuncaoSistema().getFuncionalidades().clear();
+    void primeiroAcessoRestringeRotasEExigeNovoLoginAposTroca() throws Exception {
+        prepararUsuario(true);
+        adicionarPermissao(usuario, "TELA_FINANCEIRO");
+        adicionarPermissao(usuario, "TELA_FUNCOES_SISTEMA");
         usuario.setSenha(passwordEncoder.encode("ABC123"));
         when(usuarioRepository.saveAndFlush(any(Usuario.class))).thenAnswer(invocacao -> invocacao.getArgument(0));
-        String token = tokenService.gerarToken(1).accesToken();
+        String loginInicial = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"teste@example.com\",\"senha\":\"ABC123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.primeiroAcesso").value(true))
+                .andReturn().getResponse().getContentAsString();
+        String token = JsonPath.read(loginInicial, "$.accesToken");
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.primeiroAcesso").value(true))
+                .andExpect(jsonPath("$.permissoes", hasSize(0)));
+        for (String caminho : List.of("/usuarios", "/funcoes-sistema", "/funcionalidades-sistema",
+                "/api/financeiro/dashboard", "/minha-conta")) {
+            mvc.perform(get(caminho).header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+        }
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + token))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken()))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"errada\",\"novaSenha\":\"SenhaNova123!\"}"))
+                .andExpect(status().isBadRequest());
+        assertTrue(usuario.isPrimeiroAcesso());
+        verify(usuarioRepository, never()).saveAndFlush(any());
+
         mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"senhaAtual\":\"ABC123\",\"novaSenha\":\"SenhaNova123!\"}"))
                 .andExpect(status().isNoContent()).andExpect(content().string(""));
         org.junit.jupiter.api.Assertions.assertTrue(passwordEncoder.matches("SenhaNova123!", usuario.getSenha()));
         org.junit.jupiter.api.Assertions.assertFalse(passwordEncoder.matches("ABC123", usuario.getSenha()));
-        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+        assertFalse(usuario.isPrimeiroAcesso());
+        String loginNormal = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"teste@example.com\",\"senha\":\"SenhaNova123!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.primeiroAcesso").value(false))
+                .andReturn().getResponse().getContentAsString();
+        String tokenNormal = JsonPath.read(loginNormal, "$.accesToken");
+        mvc.perform(get("/usuarios").header("Authorization", "Bearer " + tokenNormal))
                 .andExpect(status().isOk());
         mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"teste@example.com\",\"senha\":\"ABC123\"}"))
                 .andExpect(status().isUnauthorized());
-        // JWTs emitidos continuam válidos até expirar; o logout após a troca pertence ao front.
-        mvc.perform(get("/minha-conta").header("Authorization", "Bearer " + token)).andExpect(status().isOk());
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + token)).andExpect(status().isUnauthorized());
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"senhaAtual\":\"SenhaNova123!\",\"novaSenha\":\"OutraSenha123!\"}"))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
     void novaSenhaIgualOuMaiorQueLimiteUtf8NaoEGravada() throws Exception {
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
         mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + token).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"senhaAtual\":\"SenhaDeTeste123!\",\"novaSenha\":\"SenhaDeTeste123!\"}"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("NOVA_SENHA_IGUAL"));
@@ -926,7 +975,7 @@ class AutenticacaoSwaggerTests {
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"nome\":\"A\",\"email\":\"teste@example.com\"}", "{\"nome\":\"Nome válido\",\"email\":\"invalido\"}"})
     void minhaContaValidaDadosPessoais(String corpo) throws Exception {
-        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+        mvc.perform(put("/minha-conta").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isBadRequest());
         verify(usuarioRepository, never()).saveAndFlush(any());
@@ -935,7 +984,7 @@ class AutenticacaoSwaggerTests {
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"senhaAtual\":\"ABC123\",\"novaSenha\":\"curta\"}"})
     void minhaContaValidaDadosDaSenha(String corpo) throws Exception {
-        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + tokenService.gerarToken(1).accesToken())
+        mvc.perform(put("/minha-conta/senha").header("Authorization", "Bearer " + tokenService.gerarToken(1, false).accesToken())
                         .contentType(MediaType.APPLICATION_JSON).content(corpo))
                 .andExpect(status().isBadRequest());
         verify(usuarioRepository, never()).saveAndFlush(any());
@@ -957,6 +1006,7 @@ class AutenticacaoSwaggerTests {
     @Test
     void exclusaoInativaUsuarioSemApagarERevogaAcesso() throws Exception {
         Usuario alvo = new Usuario();
+        alvo.concluirPrimeiroAcesso();
         alvo.setId(5);
         alvo.setNome("Maria");
         alvo.setEmail("maria@example.com");
@@ -968,14 +1018,14 @@ class AutenticacaoSwaggerTests {
                 mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
         doAnswer(invocacao -> { servico.excluir(invocacao.getArgument(0), invocacao.getArgument(1)); return null; })
                 .when(usuarioService).excluir(any(), any());
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
 
         mvc.perform(delete("/usuarios/5").header("Authorization", "Bearer " + token))
                 .andExpect(status().isNoContent());
         assertFalse(alvo.isAtivo());
         verify(usuarioRepository).save(alvo);
         verify(usuarioRepository, never()).deleteById(any());
-        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + tokenService.gerarToken(5).accesToken()))
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + tokenService.gerarToken(5, false).accesToken()))
                 .andExpect(status().isUnauthorized());
 
         // Repetir a exclusão é idempotente.
@@ -992,7 +1042,7 @@ class AutenticacaoSwaggerTests {
                 mock(FuncaoSistemaRepository.class), passwordEncoder, mock(EmailService.class));
         doAnswer(invocacao -> { servico.excluir(invocacao.getArgument(0), invocacao.getArgument(1)); return null; })
                 .when(usuarioService).excluir(any(), any());
-        String token = tokenService.gerarToken(1).accesToken();
+        String token = tokenService.gerarToken(1, false).accesToken();
 
         mvc.perform(delete("/usuarios/1").header("Authorization", "Bearer " + token))
                 .andExpect(status().isConflict())
