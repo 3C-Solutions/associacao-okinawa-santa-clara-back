@@ -12,10 +12,12 @@ public record EnderecoRequest(
         @Schema(description = "Logradouro do endereço", example = "Rua das Flores", requiredMode = Schema.RequiredMode.REQUIRED)
         String rua,
 
+        @NotBlank
         @Size(max = 255)
         @Schema(description = "Bairro", example = "Liberdade")
         String bairro,
 
+        @NotBlank
         @Size(max = 255)
         @Schema(description = "Cidade", example = "São Paulo")
         String cidade,
@@ -24,10 +26,12 @@ public record EnderecoRequest(
         @Schema(description = "Número do endereço", example = "245")
         String numero,
 
+        @NotBlank
         @Pattern(regexp = "^$|^[a-zA-Z]{2}$", message = "deve conter a sigla de UF com duas letras")
         @Schema(description = "Unidade Federativa", example = "SP")
         String uf,
 
+        @NotBlank
         @Pattern(regexp = "^$|^\\d{5}-?\\d{3}$", message = "deve conter um CEP válido")
         @Schema(description = "CEP com ou sem hífen", example = "01504-001")
         String cep,
