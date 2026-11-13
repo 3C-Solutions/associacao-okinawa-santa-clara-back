@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 @Entity
-@Table(name = "pagamentodepartamento")
+@Table(name = "pagamento_departamento")
 public class PagamentoDepartamento {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
