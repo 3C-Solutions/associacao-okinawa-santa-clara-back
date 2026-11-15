@@ -196,9 +196,13 @@ public class FinanceiroService {
             return pagamentos().stream().filter(x->x.id_pagamento_cobranca()==id).findFirst().orElseThrow();
         }
         private String tipo(String valor) {
-            return switch(normalizar(valor)) {
-                case "entrada"->"ENTRADA";case "saida"->"SAIDA";
-                default -> throw erro(HttpStatus.BAD_REQUEST,"Tipo de lançamento inválido");
+            return switch (normalizar(valor)) {
+                case "entrada", "receita" -> "ENTRADA";
+                case "saida", "despesa" -> "SAIDA";
+                default -> throw erro(
+                        HttpStatus.BAD_REQUEST,
+                        "Tipo de lançamento inválido: " + valor
+                );
             };
         }
         private String status(String valor) {
