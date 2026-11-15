@@ -5,6 +5,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 @Entity
@@ -12,9 +14,10 @@ import java.time.LocalDate;
 public class Lancamento {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id_lancamento")
+    @Column(name = "id")
     private Integer idLancamento;
-    @Column(name = "dt_lancamento")
+    @NotNull(message = "A data do lançamento é obrigatória")
+    @Column(name = "data_lancamento", nullable = false)
     private LocalDate dtLancamento;
     @Column(name = "tipo_lancamento", length = 45)
     private String tipoLancamento;
