@@ -153,4 +153,30 @@ public class GlobalExceptionHandler extends RuntimeException {
                         "Operação não permitida: registro vinculado ou dado inválido no banco",
                         LocalDateTime.now()));
     }
+
+    @ExceptionHandler(RegraNegocioException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRegraNegocio(
+            RegraNegocioException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ErrorResponseDTO(
+                        400,
+                        ex.getMessage(),
+                        LocalDateTime.now()
+                )
+        );
+    }
+
+    @ExceptionHandler(RecursoEmUsoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRecursoEmUso(
+            RecursoEmUsoException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponseDTO(
+                        409,
+                        ex.getMessage(),
+                        LocalDateTime.now()
+                )
+        );
+    }
 }
