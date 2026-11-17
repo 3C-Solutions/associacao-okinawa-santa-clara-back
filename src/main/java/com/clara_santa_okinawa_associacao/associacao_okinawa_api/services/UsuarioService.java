@@ -12,6 +12,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.Usuario
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.CsvUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -19,8 +20,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.security.SecureRandom;
+import java.text.Collator;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 public class UsuarioService {
@@ -49,6 +53,59 @@ public class UsuarioService {
         List<Usuario> usuarios = usuarioRepository.findAll();
 
         return UsuarioMapper.toResponse(usuarios);
+    }
+
+    @Transactional(readOnly = true)
+    public byte[] exportarCsv(String busca, Integer funcaoId, boolean semFuncao) {
+        if ((funcaoId != null && funcaoId <= 0) || (funcaoId != null && semFuncao)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filtro de funcao invalido");
+        }
+        String consulta = busca == null ? "" : busca.trim().toLowerCase(Locale.forLanguageTag("pt-BR"));
+        Collator ordenacao = Collator.getInstance(Locale.forLanguageTag("pt-BR"));
+        Comparator<Usuario> porNome = (primeiro, segundo) -> ordenacao.compare(
+                primeiro.getNome() == null ? "" : primeiro.getNome(),
+                segundo.getNome() == null ? "" : segundo.getNome());
+
+        List<List<String>> linhas = usuarioRepository.findAll().stream()
+                .filter(usuario -> semFuncao ? usuario.getFuncaoSistema() == null
+                        : funcaoId == null || usuario.getFuncaoSistema() != null
+                        && funcaoId.equals(usuario.getFuncaoSistema().getId()))
+                .filter(usuario -> correspondeBusca(usuario, consulta))
+                .sorted(porNome)
+                .map(usuario -> {
+                    String funcao = usuario.getFuncaoSistema() == null
+                            ? "Sem função" : usuario.getFuncaoSistema().getNome();
+                    String familia = usuario.getFamilia() == null ? "" : usuario.getFamilia().getNome();
+                    String vinculo = familia.isBlank() ? "Família não informada" : "Família " + familia;
+                    return List.of(
+                            valor(usuario.getNome()),
+                            valor(funcao),
+                            valor(usuario.getEmail()),
+                            valor(usuario.getTelefone()),
+                            familia,
+                            vinculo,
+                            "Não disponível",
+                            usuario.isAtivo() ? "Ativo" : "Inativo");
+                })
+                .toList();
+
+        return CsvUtils.gerar(
+                List.of("Nome", "Função", "E-mail", "Telefone", "Família", "Vínculo", "Departamentos", "Situação"),
+                linhas);
+    }
+
+    private static boolean correspondeBusca(Usuario usuario, String consulta) {
+        if (consulta.isEmpty()) return true;
+        String funcao = usuario.getFuncaoSistema() == null ? "Sem função" : usuario.getFuncaoSistema().getNome();
+        String familia = usuario.getFamilia() == null ? "" : usuario.getFamilia().getNome();
+        String vinculo = familia.isBlank() ? "Família não informada" : "Família " + familia;
+        return String.join(" ", valor(usuario.getNome()), valor(usuario.getEmail()), valor(usuario.getTelefone()),
+                        valor(funcao), vinculo)
+                .toLowerCase(Locale.forLanguageTag("pt-BR")).contains(consulta);
+    }
+
+    private static String valor(String texto) {
+        return texto == null ? "" : texto;
     }
 
     public UsuarioResponse buscarPorId(Integer id) {
