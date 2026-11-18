@@ -3,7 +3,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.*;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.*;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.*;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.CsvUtils;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.XlsxUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,7 +11,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.*;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 @Service
 public class FinanceiroDashboardService {
@@ -102,7 +101,7 @@ public class FinanceiroDashboardService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] exportarCsv(int ano, int mes, LocalDate dataInicio, LocalDate dataFim,
+    public byte[] exportarXlsx(int ano, int mes, LocalDate dataInicio, LocalDate dataFim,
                               String tipo, String status, String busca) {
         if (ano < 2000 || ano > 2100 || mes < 1 || mes > 12) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ano ou mes invalido");
@@ -119,8 +118,6 @@ public class FinanceiroDashboardService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Status de lancamento invalido");
         }
         String consulta = busca == null ? "" : busca.trim().toLowerCase(Locale.forLanguageTag("pt-BR"));
-        DateTimeFormatter formatoData = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
         List<LancamentoFinanceiroResponse> lancamentos = new ArrayList<>();
         for (Despesas item : despesas.findAll()) {
             if (item.getDtDepesa() == null) continue;
@@ -150,7 +147,7 @@ public class FinanceiroDashboardService {
                     item.getFkFamilia()));
         }
 
-        List<List<String>> linhas = lancamentos.stream()
+        List<? extends List<?>> linhas = lancamentos.stream()
                 .filter(item -> dataInicio == null || !item.data().isBefore(dataInicio))
                 .filter(item -> dataFim == null || !item.data().isAfter(dataFim))
                 .filter(item -> tipoNormalizado == null || item.tipo().equals(tipoNormalizado))
@@ -158,19 +155,18 @@ public class FinanceiroDashboardService {
                 .filter(item -> consulta.isEmpty() || (Objects.toString(item.descricao(), "") + " "
                         + Objects.toString(item.categoria(), ""))
                         .toLowerCase(Locale.forLanguageTag("pt-BR")).contains(consulta))
-                .map(item -> List.of(
-                        item.data().format(formatoData),
+                .map(item -> List.<Object>of(
+                        item.data(),
                         Objects.toString(item.descricao(), ""),
                         Objects.toString(item.categoria(), ""),
                         item.tipo().equals("ENTRADA") ? "Entrada" : "Saída",
-                        item.valor().setScale(2, RoundingMode.HALF_UP)
-                                .toPlainString().replace('.', ','),
+                        item.valor().setScale(2, RoundingMode.HALF_UP),
                         FinanceiroRegras.pago(item.status())
                                 ? (item.tipo().equals("ENTRADA") ? "Recebido" : "Pago")
                                 : Objects.toString(item.status(), "").trim()))
                 .toList();
 
-        return CsvUtils.gerar(
+        return XlsxUtils.gerar("Financeiro",
                 List.of("Data", "Descrição", "Categoria", "Tipo", "Valor", "Status"),
                 linhas);
     }

@@ -5,7 +5,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.Us
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.usuario.UsuarioUpdateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.error.ErrorResponseDTO;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.UsuarioService;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.CsvResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.XlsxResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -66,12 +66,12 @@ public class UsuarioController {
         return ResponseEntity.status(HttpStatus.OK).body(usuarioService.listar());
     }
 
-    @GetMapping(value = "/export.csv", produces = "text/csv")
+    @GetMapping(value = "/export.xlsx", produces = XlsxResponse.CONTENT_TYPE)
     public ResponseEntity<byte[]> exportar(
             @RequestParam(required = false) String busca,
             @RequestParam(required = false) Integer funcaoId,
             @RequestParam(defaultValue = "false") boolean semFuncao) {
-        return CsvResponse.attachment("usuarios.csv", usuarioService.exportarCsv(busca, funcaoId, semFuncao));
+        return XlsxResponse.attachment("usuarios.xlsx", usuarioService.exportarXlsx(busca, funcaoId, semFuncao));
     }
 
     @Operation(

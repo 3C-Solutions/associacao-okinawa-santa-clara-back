@@ -12,7 +12,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.Usuario
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.CsvUtils;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.XlsxUtils;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -56,7 +56,7 @@ public class UsuarioService {
     }
 
     @Transactional(readOnly = true)
-    public byte[] exportarCsv(String busca, Integer funcaoId, boolean semFuncao) {
+    public byte[] exportarXlsx(String busca, Integer funcaoId, boolean semFuncao) {
         if ((funcaoId != null && funcaoId <= 0) || (funcaoId != null && semFuncao)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Filtro de funcao invalido");
         }
@@ -89,7 +89,7 @@ public class UsuarioService {
                 })
                 .toList();
 
-        return CsvUtils.gerar(
+        return XlsxUtils.gerar("Usuários",
                 List.of("Nome", "Função", "E-mail", "Telefone", "Família", "Vínculo", "Departamentos", "Situação"),
                 linhas);
     }

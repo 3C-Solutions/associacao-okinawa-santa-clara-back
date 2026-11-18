@@ -2,7 +2,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.DashboardFinanceiroResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FinanceiroDashboardService;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.CsvResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.utils.XlsxResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +19,7 @@ public class FinanceiroDashboardController {
         return ResponseEntity.status(200).body(service.dashboard(ano, mes));
     }
 
-    @GetMapping(value = "/export.csv", produces = "text/csv")
+    @GetMapping(value = "/export.xlsx", produces = XlsxResponse.CONTENT_TYPE)
     public ResponseEntity<byte[]> exportar(
             @RequestParam Integer ano,
             @RequestParam Integer mes,
@@ -28,7 +28,7 @@ public class FinanceiroDashboardController {
             @RequestParam(required = false) String tipo,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String busca) {
-        return CsvResponse.attachment("financeiro.csv",
-                service.exportarCsv(ano, mes, dataInicio, dataFim, tipo, status, busca));
+        return XlsxResponse.attachment("financeiro.xlsx",
+                service.exportarXlsx(ano, mes, dataInicio, dataFim, tipo, status, busca));
     }
 }
