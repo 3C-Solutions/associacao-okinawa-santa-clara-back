@@ -16,10 +16,9 @@ public class ImagemMapper {
             return null;
         }
 
-        // ?v=<nome do arquivo> muda a cada troca de imagem e evita cache velho no navegador
         return new ImagemResponse(
                 imagem.getId(),
-                "/imagens/" + imagem.getId() + "/arquivo?v=" + imagem.getNomeArquivo()
+                imagem.getUrl()
         );
     }
 

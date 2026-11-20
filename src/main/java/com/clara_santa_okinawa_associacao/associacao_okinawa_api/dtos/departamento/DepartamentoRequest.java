@@ -32,7 +32,6 @@ public record DepartamentoRequest(
         @Positive
         Integer fkFamilia,
 
-
         @NotNull
         @Positive
         Integer quantidadeVagas,

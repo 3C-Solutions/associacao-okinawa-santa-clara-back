@@ -50,20 +50,35 @@ public class ImagemService {
         }
     }
 
-    @Transactional
-    public Imagem cadastrar(MultipartFile arquivo) {
-        Imagem imagem = new Imagem();
-        gravar(imagem, arquivo);
-        return imagemRepository.save(imagem);
-    }
 
     @Transactional
-    public Imagem editar(Integer id, MultipartFile arquivo) {
-        Imagem imagem = buscarPorId(id);
-        String arquivoAntigo = imagem.getNomeArquivo();
+    public Imagem cadastrar(MultipartFile arquivo) {
+
+        Imagem imagem = new Imagem();
+
         gravar(imagem, arquivo);
+
         Imagem salva = imagemRepository.save(imagem);
+
+        salva.setUrl("/imagens/" + salva.getId() + "/arquivo");
+
+        return imagemRepository.save(salva);
+    }
+    @Transactional
+    public Imagem editar(Integer id, MultipartFile arquivo) {
+
+        Imagem imagem = buscarPorId(id);
+
+        String arquivoAntigo = imagem.getNomeArquivo();
+
+        gravar(imagem, arquivo);
+
+        imagem.setUrl("/imagens/" + imagem.getId() + "/arquivo");
+
+        Imagem salva = imagemRepository.save(imagem);
+
         apagarArquivo(arquivoAntigo);
+
         return salva;
     }
 
@@ -134,6 +149,7 @@ public class ImagemService {
         imagem.setNomeOriginal(arquivo.getOriginalFilename());
         imagem.setTipoConteudo(arquivo.getContentType());
         imagem.setTamanho(arquivo.getSize());
+        imagem.setUrl("/imagens/" + imagem.getId() + "/arquivo");
     }
 
     private void apagarArquivo(String nomeArquivo) {
