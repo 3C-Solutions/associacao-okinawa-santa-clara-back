@@ -1,15 +1,19 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.imagem.*;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.imagem.ImagemResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Imagem;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.ImagemMapper;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.ImagemService;
 
-import jakarta.validation.Valid;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -22,58 +26,46 @@ public class ImagemController {
         this.imagemService = imagemService;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImagemResponse> cadastrar(
-            @Valid @RequestBody ImagemRequest dto
+            @RequestPart("arquivo") MultipartFile arquivo
     ) {
-
-        Imagem imagem = ImagemMapper.toEntity(dto);
-
-        Imagem cadastrada = imagemService.cadastrar(imagem);
-
+        Imagem cadastrada = imagemService.cadastrar(arquivo);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ImagemMapper.toResponse(cadastrada));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ImagemResponse> editar(
             @PathVariable Integer id,
-            @Valid @RequestBody ImagemRequest dto
+            @RequestPart("arquivo") MultipartFile arquivo
     ) {
-
-        Imagem imagem = ImagemMapper.toEntity(dto);
-
-        Imagem atualizada = imagemService.editar(id, imagem);
-
-        return ResponseEntity.status(HttpStatus.OK)
-                .body(ImagemMapper.toResponse(atualizada));
+        Imagem atualizada = imagemService.editar(id, arquivo);
+        return ResponseEntity.ok(ImagemMapper.toResponse(atualizada));
     }
 
     @GetMapping
     public ResponseEntity<List<ImagemResponse>> listar() {
-
-        List<Imagem> imagens = imagemService.listar();
-
-        return ResponseEntity.status(HttpStatus.OK)
-                .body(ImagemMapper.toResponse(imagens));
+        return ResponseEntity.ok(ImagemMapper.toResponse(imagemService.listar()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ImagemResponse> buscarPorId(
-            @PathVariable Integer id
-    ) {
+    public ResponseEntity<ImagemResponse> buscarPorId(@PathVariable Integer id) {
+        return ResponseEntity.ok(ImagemMapper.toResponse(imagemService.buscarPorId(id)));
+    }
 
+    @GetMapping("/{id}/arquivo")
+    public ResponseEntity<Resource> arquivo(@PathVariable Integer id) {
         Imagem imagem = imagemService.buscarPorId(id);
-
-        return ResponseEntity.status(HttpStatus.OK)
-                .body(ImagemMapper.toResponse(imagem));
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(imagem.getTipoConteudo()))
+                .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
+                .body(imagemService.carregar(imagem));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Integer id) {
-
         imagemService.excluir(id);
-
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
     }
 }

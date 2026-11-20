@@ -32,8 +32,6 @@ public record DepartamentoRequest(
         @Positive
         Integer fkFamilia,
 
-        @NotBlank
-        String imagemUrl,
 
         @NotNull
         @Positive

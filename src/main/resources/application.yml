@@ -38,3 +38,13 @@ app:
     secret: ${JWT_SECRET}
     issuer: associacao-api
     expiration-minutes: 15
+
+    spring:
+      servlet:
+        multipart:
+          max-file-size: 1MB
+          max-request-size: 2MB
+
+    app:
+      upload:
+        dir: ${UPLOAD_DIR:./uploads}

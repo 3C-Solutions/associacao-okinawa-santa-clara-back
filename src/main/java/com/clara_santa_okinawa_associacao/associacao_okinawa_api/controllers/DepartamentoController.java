@@ -7,8 +7,10 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.Depart
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -22,32 +24,6 @@ public class DepartamentoController {
         this.departamentoService = departamentoService;
     }
 
-    @PostMapping
-    public ResponseEntity<DepartamentoResponse> cadastrar(
-            @Valid @RequestBody DepartamentoRequest dto
-    ) {
-
-        Departamento departamento = DepartamentoMapper.toEntity(dto);
-
-        Departamento cadastrado = departamentoService.cadastrar(departamento);
-
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(DepartamentoMapper.toResponse(cadastrado));
-    }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<DepartamentoResponse> editar(
-            @PathVariable Integer id,
-            @Valid @RequestBody DepartamentoRequest dto
-    ) {
-
-        Departamento departamento = DepartamentoMapper.toEntity(dto);
-
-        Departamento atualizado = departamentoService.editar(id, departamento);
-
-        return ResponseEntity.status(HttpStatus.OK)
-                .body(DepartamentoMapper.toResponse(atualizado));
-    }
 
     @GetMapping
     public ResponseEntity<List<DepartamentoResponse>> listar() {
@@ -75,5 +51,29 @@ public class DepartamentoController {
         departamentoService.excluir(id);
 
         return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
+
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DepartamentoResponse> cadastrar(
+            @Valid @RequestPart("dados") DepartamentoRequest dto,
+            @RequestPart("imagem") MultipartFile imagem
+    ) {
+        Departamento departamento = DepartamentoMapper.toEntity(dto);
+        Departamento cadastrado = departamentoService.cadastrar(departamento, imagem);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(DepartamentoMapper.toResponse(cadastrado));
+    }
+
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<DepartamentoResponse> editar(
+            @PathVariable Integer id,
+            @Valid @RequestPart("dados") DepartamentoRequest dto,
+            @RequestPart(value = "imagem", required = false) MultipartFile imagem
+    ) {
+        Departamento departamento = DepartamentoMapper.toEntity(dto);
+        Departamento atualizado = departamentoService.editar(id, departamento, imagem);
+
+        return ResponseEntity.ok(DepartamentoMapper.toResponse(atualizado));
     }
 }

@@ -4,6 +4,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Depart
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalTime;
+import java.util.List;
 
 public interface DepartamentoRepository extends JpaRepository<Departamento, Integer> {
 
@@ -23,4 +24,7 @@ public interface DepartamentoRepository extends JpaRepository<Departamento, Inte
     );
 
     boolean existsByImagem_Id(Integer imagemId);
+
+    List<Departamento> findByAtivoTrueOrderByNomeAsc();
+
 }

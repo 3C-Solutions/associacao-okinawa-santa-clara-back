@@ -3,7 +3,7 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.*;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.*;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.*;
-
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,48 +16,43 @@ public class DepartamentoService {
     private final MatriculaRepository matriculaRepository;
     private final UsuarioRepository usuarioRepository;
     private final FamiliaRepository familiaRepository;
-    private final ImagemRepository imagemRepository;
+    private final ImagemService imagemService;
 
     public DepartamentoService(
             DepartamentoRepository departamentoRepository,
             MatriculaRepository matriculaRepository,
             UsuarioRepository usuarioRepository,
             FamiliaRepository familiaRepository,
-            ImagemRepository imagemRepository
+            ImagemService imagemService
     ) {
         this.departamentoRepository = departamentoRepository;
         this.matriculaRepository = matriculaRepository;
         this.usuarioRepository = usuarioRepository;
         this.familiaRepository = familiaRepository;
-        this.imagemRepository = imagemRepository;
+        this.imagemService = imagemService;
     }
 
     @Transactional
-    public Departamento cadastrar(Departamento departamento) {
+    public Departamento cadastrar(Departamento departamento, MultipartFile imagem) {
 
         validarNome(departamento.getNome(), null);
         validarDiaHorario(departamento, null);
-        validarImagem(departamento);
         validarResponsavelEFamilia(departamento);
         validarQuantidadeVagas(departamento.getQuantidadeVagas());
 
-        Imagem imagemSalva = imagemRepository.save(
-                departamento.getImagem()
-        );
-
-        departamento.setImagem(imagemSalva);
+        // valida arquivo obrigatório, tipo e tamanho
+        departamento.setImagem(imagemService.cadastrar(imagem));
 
         return departamentoRepository.save(departamento);
     }
 
     @Transactional
-    public Departamento editar(Integer id, Departamento atualizado) {
+    public Departamento editar(Integer id, Departamento atualizado, MultipartFile imagem) {
 
         Departamento departamento = buscarPorId(id);
 
         validarNome(atualizado.getNome(), id);
         validarDiaHorario(atualizado, id);
-        validarImagem(atualizado);
         validarResponsavelEFamilia(atualizado);
         validarQuantidadeVagas(atualizado.getQuantidadeVagas());
 
@@ -70,27 +65,16 @@ public class DepartamentoService {
         departamento.setValorMensal(atualizado.getValorMensal());
         departamento.setQuantidadeVagas(atualizado.getQuantidadeVagas());
         departamento.setAtivo(atualizado.getAtivo());
-
-        departamento.setResponsavelDepartamento(
-                atualizado.getResponsavelDepartamento()
-        );
-
+        departamento.setResponsavelDepartamento(atualizado.getResponsavelDepartamento());
         departamento.setFamilia(atualizado.getFamilia());
 
-        // Atualiza a imagem já vinculada ao departamento.
-        if (departamento.getImagem() != null) {
-
-            departamento.getImagem().setUrl(
-                    atualizado.getImagem().getUrl()
-            );
-
-        } else {
-
-            Imagem imagemSalva = imagemRepository.save(
-                    atualizado.getImagem()
-            );
-
-            departamento.setImagem(imagemSalva);
+        // Imagem é opcional na edição. Se não vier, mantém a atual.
+        if (imagem != null && !imagem.isEmpty()) {
+            if (departamento.getImagem() != null) {
+                imagemService.editar(departamento.getImagem().getId(), imagem);
+            } else {
+                departamento.setImagem(imagemService.cadastrar(imagem));
+            }
         }
 
         return departamentoRepository.save(departamento);
@@ -122,8 +106,11 @@ public class DepartamentoService {
                     "Não é possível excluir o departamento, pois existem matrículas vinculadas a ele."
             );
         }
-
+        Imagem imagem = departamento.getImagem();
         departamentoRepository.delete(departamento);
+        if (imagem != null) {
+            imagemService.excluirOrfa(imagem);
+        }
     }
 
     private void validarNome(String nome, Integer id) {
@@ -183,17 +170,6 @@ public class DepartamentoService {
         }
     }
 
-    private void validarImagem(Departamento departamento) {
-
-        if (departamento.getImagem() == null
-                || departamento.getImagem().getUrl() == null
-                || departamento.getImagem().getUrl().isBlank()) {
-
-            throw new RegraNegocioException(
-                    "É obrigatório informar uma imagem para o departamento."
-            );
-        }
-    }
 
     private void validarQuantidadeVagas(Integer quantidadeVagas) {
 
@@ -243,5 +219,10 @@ public class DepartamentoService {
 
         departamento.setResponsavelDepartamento(responsavel);
         departamento.setFamilia(familia);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Departamento> listarAtivos() {
+        return departamentoRepository.findByAtivoTrueOrderByNomeAsc();
     }
 }

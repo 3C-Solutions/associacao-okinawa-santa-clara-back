@@ -1,6 +1,5 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.imagem.ImagemRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.imagem.ImagemResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Imagem;
 
@@ -11,24 +10,16 @@ public class ImagemMapper {
     private ImagemMapper() {
     }
 
-    public static Imagem toEntity(ImagemRequest dto) {
-
-        Imagem imagem = new Imagem();
-
-        imagem.setUrl(dto.url().trim());
-
-        return imagem;
-    }
-
     public static ImagemResponse toResponse(Imagem imagem) {
 
         if (imagem == null) {
             return null;
         }
 
+        // ?v=<nome do arquivo> muda a cada troca de imagem e evita cache velho no navegador
         return new ImagemResponse(
                 imagem.getId(),
-                imagem.getUrl()
+                "/imagens/" + imagem.getId() + "/arquivo?v=" + imagem.getNomeArquivo()
         );
     }
 

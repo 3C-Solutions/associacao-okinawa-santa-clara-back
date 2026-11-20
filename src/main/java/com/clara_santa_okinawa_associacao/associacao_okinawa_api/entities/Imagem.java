@@ -10,10 +10,25 @@ public class Imagem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    private String url;
+    @Column(name = "nome_arquivo", length = 100)
+    private String nomeArquivo;
+
+    @Column(name = "nome_original", length = 150)
+    private String nomeOriginal;
+
+    @Column(name = "tipo_conteudo", length = 50)
+    private String tipoConteudo;
+
+    private Long tamanho;
 
     public Integer getId() { return id; }
     public void setId(Integer id) { this.id = id; }
-    public String getUrl() { return url; }
-    public void setUrl(String url) { this.url = url; }
+    public String getNomeArquivo() { return nomeArquivo; }
+    public void setNomeArquivo(String nomeArquivo) { this.nomeArquivo = nomeArquivo; }
+    public String getNomeOriginal() { return nomeOriginal; }
+    public void setNomeOriginal(String nomeOriginal) { this.nomeOriginal = nomeOriginal; }
+    public String getTipoConteudo() { return tipoConteudo; }
+    public void setTipoConteudo(String tipoConteudo) { this.tipoConteudo = tipoConteudo; }
+    public Long getTamanho() { return tamanho; }
+    public void setTamanho(Long tamanho) { this.tamanho = tamanho; }
 }
