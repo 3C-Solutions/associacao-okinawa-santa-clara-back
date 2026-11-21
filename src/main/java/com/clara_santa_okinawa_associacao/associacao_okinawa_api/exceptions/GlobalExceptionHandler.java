@@ -86,6 +86,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
+
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler extends RuntimeException {
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -152,5 +156,50 @@ public class GlobalExceptionHandler extends RuntimeException {
                 new ErrorResponseDTO(409,
                         "Operação não permitida: registro vinculado ou dado inválido no banco",
                         LocalDateTime.now()));
+    }
+
+    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRecursoNaoEncontrado(RecursoNaoEncontradoException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(404, ex.getMessage(), LocalDateTime.now()));
+    }
+
+    @ExceptionHandler(RegraNegocioException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRegraNegocio(
+            RegraNegocioException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                new ErrorResponseDTO(
+                        400,
+                        ex.getMessage(),
+                        LocalDateTime.now()
+                )
+        );
+    }
+
+    @ExceptionHandler(RecursoEmUsoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRecursoEmUso(
+            RecursoEmUsoException ex
+    ) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                new ErrorResponseDTO(
+                        409,
+                        ex.getMessage(),
+                        LocalDateTime.now()
+                )
+        );
+    }
+
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponseDTO> handleArquivoGrande(MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(
+                new ErrorResponseDTO(413, "A imagem deve ter no máximo 1 MB.", LocalDateTime.now()));
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponseDTO> handleParteAusente(MissingServletRequestPartException ex) {
+        return ResponseEntity.badRequest().body(
+                new ErrorResponseDTO(400, "Parte obrigatória ausente: " + ex.getRequestPartName(), LocalDateTime.now()));
     }
 }
