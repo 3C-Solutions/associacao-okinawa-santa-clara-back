@@ -39,7 +39,10 @@ public class SecurityConfig {
                         .hasAnyAuthority(ACESSO.autoridade(), PRIMEIRO_ACESSO.autoridade())
                         .requestMatchers(HttpMethod.PUT, "/minha-conta/senha")
                         .hasAnyAuthority(ACESSO.autoridade(), PRIMEIRO_ACESSO.autoridade())
+                        .requestMatchers(HttpMethod.GET, "/imagens/*/arquivo").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/publico/departamentos").permitAll()
                         .anyRequest().hasAuthority(ACESSO.autoridade())
+
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(permissoesJwtConverter)));
