@@ -158,6 +158,12 @@ public class GlobalExceptionHandler extends RuntimeException {
                         LocalDateTime.now()));
     }
 
+    @ExceptionHandler(RecursoNaoEncontradoException.class)
+    public ResponseEntity<ErrorResponseDTO> handleRecursoNaoEncontrado(RecursoNaoEncontradoException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponseDTO(404, ex.getMessage(), LocalDateTime.now()));
+    }
+
     @ExceptionHandler(RegraNegocioException.class)
     public ResponseEntity<ErrorResponseDTO> handleRegraNegocio(
             RegraNegocioException ex

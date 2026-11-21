@@ -1,5 +1,21 @@
 # API Associação Okinawa
 
+## Imagens dos departamentos
+
+Antes de iniciar a versão que armazena imagens no PostgreSQL, aplique
+`database/migrations/20261120_imagem_conteudo.sql` no banco com a tabela
+`imagem` existente. Combine a troca com a equipe, pois versões antigas da
+API ainda gravam na pasta local `uploads`.
+
+Para recuperar uma imagem existente, importe os bytes do arquivo identificado
+por `imagem.nome_arquivo` em `imagem_conteudo`, usando o mesmo ID. Preserve
+conteúdos já gravados no banco. Quando o arquivo original estiver indisponível,
+reenvie a imagem pela edição do departamento. Os IDs e as URLs permanecem iguais.
+
+Para validar o cadastro, a substituição, a exclusão e o rollback, configure
+`IMAGEM_INTEGRATION=true` e execute `mvnw.cmd -Dtest=ImagemIntegrationTests test`
+com as variáveis da aplicação apontando para um PostgreSQL de teste descartável.
+
 ## Seleção de famílias no financeiro
 
 As consultas `GET /familias` e `GET /familias/{id}` seguem o contrato do

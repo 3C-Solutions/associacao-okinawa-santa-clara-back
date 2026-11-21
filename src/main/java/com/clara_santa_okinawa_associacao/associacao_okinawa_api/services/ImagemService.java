@@ -1,85 +1,63 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Imagem;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.*;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.*;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.ImagemConteudo;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.RecursoEmUsoException;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.RecursoNaoEncontradoException;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.RegraNegocioException;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.DepartamentoRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.ImagemConteudoRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.ImagemRepository;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.Set;
 
 @Service
 public class ImagemService {
 
     private static final long TAMANHO_MAXIMO = 1024 * 1024;
-    private static final Map<String, String> EXTENSOES = Map.of(
-            "image/jpeg", ".jpg",
-            "image/png", ".png",
-            "image/webp", ".webp"
-    );
+    private static final Set<String> TIPOS_PERMITIDOS = Set.of("image/jpeg", "image/png", "image/webp");
 
     private final ImagemRepository imagemRepository;
     private final DepartamentoRepository departamentoRepository;
-    private final Path pasta;
+    private final ImagemConteudoRepository imagemConteudoRepository;
 
     public ImagemService(
             ImagemRepository imagemRepository,
             DepartamentoRepository departamentoRepository,
-            @Value("${app.upload.dir:./uploads}") String dir
+            ImagemConteudoRepository imagemConteudoRepository
     ) {
         this.imagemRepository = imagemRepository;
         this.departamentoRepository = departamentoRepository;
-        this.pasta = Paths.get(dir).toAbsolutePath().normalize();
-        try {
-            Files.createDirectories(this.pasta);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Não foi possível criar a pasta de uploads.", e);
-        }
+        this.imagemConteudoRepository = imagemConteudoRepository;
     }
 
 
     @Transactional
     public Imagem cadastrar(MultipartFile arquivo) {
-
         Imagem imagem = new Imagem();
-
-        gravar(imagem, arquivo);
-
+        byte[] conteudo = prepararArquivo(imagem, arquivo);
+        imagem.setUrl("/imagens");
         Imagem salva = imagemRepository.save(imagem);
-
         salva.setUrl("/imagens/" + salva.getId() + "/arquivo");
-
-        return imagemRepository.save(salva);
+        imagemConteudoRepository.save(new ImagemConteudo(salva, conteudo));
+        return salva;
     }
+
     @Transactional
     public Imagem editar(Integer id, MultipartFile arquivo) {
-
         Imagem imagem = buscarPorId(id);
-
-        String arquivoAntigo = imagem.getNomeArquivo();
-
-        gravar(imagem, arquivo);
-
-        imagem.setUrl("/imagens/" + imagem.getId() + "/arquivo");
-
-        Imagem salva = imagemRepository.save(imagem);
-
-        apagarArquivo(arquivoAntigo);
-
-        return salva;
+        byte[] conteudo = prepararArquivo(imagem, arquivo);
+        imagemConteudoRepository.findById(id).ifPresentOrElse(
+                existente -> existente.setConteudo(conteudo),
+                () -> imagemConteudoRepository.save(new ImagemConteudo(imagem, conteudo)));
+        return imagem;
     }
 
     @Transactional(readOnly = true)
@@ -95,15 +73,9 @@ public class ImagemService {
     }
 
     @Transactional(readOnly = true)
-    public Resource carregar(Imagem imagem) {
-        if (imagem.getNomeArquivo() == null) {
-            throw new RecursoNaoEncontradoException("A imagem não possui arquivo.");
-        }
-        Path caminho = pasta.resolve(imagem.getNomeArquivo()).normalize();
-        if (!caminho.startsWith(pasta) || !Files.exists(caminho)) {
-            throw new RecursoNaoEncontradoException("Arquivo da imagem não encontrado.");
-        }
-        return new FileSystemResource(caminho);
+    public ImagemConteudoRepository.Arquivo carregar(Integer id) {
+        return imagemConteudoRepository.buscar(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Arquivo da imagem não encontrado."));
     }
 
     @Transactional
@@ -114,49 +86,39 @@ public class ImagemService {
                     "Não é possível excluir a imagem, pois ela está vinculada a um departamento.");
         }
         imagemRepository.delete(imagem);
-        apagarArquivo(imagem.getNomeArquivo());
     }
 
     // Usado quando o departamento dono da imagem acabou de ser excluído.
     @Transactional
     public void excluirOrfa(Imagem imagem) {
-        imagemRepository.delete(imagem);
-        apagarArquivo(imagem.getNomeArquivo());
+        if (!departamentoRepository.existsByImagem_Id(imagem.getId())) {
+            imagemRepository.delete(imagem);
+        }
     }
 
-    private void gravar(Imagem imagem, MultipartFile arquivo) {
+    private byte[] prepararArquivo(Imagem imagem, MultipartFile arquivo) {
         if (arquivo == null || arquivo.isEmpty()) {
             throw new RegraNegocioException("O arquivo da imagem é obrigatório.");
         }
         if (arquivo.getSize() > TAMANHO_MAXIMO) {
             throw new RegraNegocioException("A imagem deve ter no máximo 1 MB.");
         }
-        String extensao = EXTENSOES.get(arquivo.getContentType());
-        if (extensao == null) {
+        String tipo = arquivo.getContentType();
+        if (tipo == null || !TIPOS_PERMITIDOS.contains(tipo)) {
             throw new RegraNegocioException("Formato inválido. Use PNG, JPG ou WebP.");
         }
 
-        // O nome é gerado aqui. O nome enviado pelo cliente é ignorado (evita path traversal).
-        String nomeArquivo = UUID.randomUUID() + extensao;
-
-        try (InputStream entrada = arquivo.getInputStream()) {
-            Files.copy(entrada, pasta.resolve(nomeArquivo));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Erro ao salvar a imagem.", e);
-        }
-
-        imagem.setNomeArquivo(nomeArquivo);
-        imagem.setNomeOriginal(arquivo.getOriginalFilename());
-        imagem.setTipoConteudo(arquivo.getContentType());
-        imagem.setTamanho(arquivo.getSize());
-        imagem.setUrl("/imagens/" + imagem.getId() + "/arquivo");
-    }
-
-    private void apagarArquivo(String nomeArquivo) {
-        if (nomeArquivo == null) return;
+        byte[] conteudo;
         try {
-            Files.deleteIfExists(pasta.resolve(nomeArquivo).normalize());
-        } catch (IOException ignored) {
+            conteudo = arquivo.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Erro ao ler a imagem enviada.", e);
         }
+
+        imagem.setNomeArquivo(null);
+        imagem.setNomeOriginal(arquivo.getOriginalFilename());
+        imagem.setTipoConteudo(tipo);
+        imagem.setTamanho((long) conteudo.length);
+        return conteudo;
     }
 }

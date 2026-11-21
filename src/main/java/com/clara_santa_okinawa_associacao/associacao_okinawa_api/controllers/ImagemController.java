@@ -5,7 +5,6 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Imagem
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.ImagemMapper;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.ImagemService;
 
-import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -13,7 +12,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.Duration;
 import java.util.List;
 
 @RestController
@@ -55,12 +53,12 @@ public class ImagemController {
     }
 
     @GetMapping("/{id}/arquivo")
-    public ResponseEntity<Resource> arquivo(@PathVariable Integer id) {
-        Imagem imagem = imagemService.buscarPorId(id);
+    public ResponseEntity<byte[]> arquivo(@PathVariable Integer id) {
+        var arquivo = imagemService.carregar(id);
         return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(imagem.getTipoConteudo()))
-                .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
-                .body(imagemService.carregar(imagem));
+                .contentType(MediaType.parseMediaType(arquivo.getTipoConteudo()))
+                .cacheControl(CacheControl.noCache())
+                .body(arquivo.getConteudo());
     }
 
     @DeleteMapping("/{id}")
