@@ -8,6 +8,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.Regr
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.DepartamentoRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.ImagemConteudoRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.ImagemRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.NoticiaRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,15 +28,18 @@ public class ImagemService {
     private final ImagemRepository imagemRepository;
     private final DepartamentoRepository departamentoRepository;
     private final ImagemConteudoRepository imagemConteudoRepository;
+    private final NoticiaRepository noticiaRepository;
 
     public ImagemService(
             ImagemRepository imagemRepository,
             DepartamentoRepository departamentoRepository,
-            ImagemConteudoRepository imagemConteudoRepository
+            ImagemConteudoRepository imagemConteudoRepository,
+            NoticiaRepository noticiaRepository
     ) {
         this.imagemRepository = imagemRepository;
         this.departamentoRepository = departamentoRepository;
         this.imagemConteudoRepository = imagemConteudoRepository;
+        this.noticiaRepository = noticiaRepository;
     }
 
 
@@ -52,7 +56,8 @@ public class ImagemService {
 
     @Transactional
     public Imagem editar(Integer id, MultipartFile arquivo) {
-        Imagem imagem = buscarPorId(id);
+        protegerCapa(id);
+        Imagem imagem = buscarImagem(id);
         byte[] conteudo = prepararArquivo(imagem, arquivo);
         imagemConteudoRepository.findById(id).ifPresentOrElse(
                 existente -> existente.setConteudo(conteudo),
@@ -62,11 +67,16 @@ public class ImagemService {
 
     @Transactional(readOnly = true)
     public List<Imagem> listar() {
-        return imagemRepository.findAll();
+        return imagemRepository.listarSemCapasDeNoticias();
     }
 
     @Transactional(readOnly = true)
     public Imagem buscarPorId(Integer id) {
+        return imagemRepository.buscarSemCapasDeNoticias(id)
+                .orElseThrow(() -> new RecursoNaoEncontradoException("Imagem não encontrada com o ID: " + id));
+    }
+
+    private Imagem buscarImagem(Integer id) {
         return imagemRepository.findById(id)
                 .orElseThrow(() -> new RecursoNaoEncontradoException(
                         "Imagem não encontrada com o ID: " + id));
@@ -80,19 +90,31 @@ public class ImagemService {
 
     @Transactional
     public void excluir(Integer id) {
-        Imagem imagem = buscarPorId(id);
+        protegerCapa(id);
+        Imagem imagem = buscarImagem(id);
         if (departamentoRepository.existsByImagem_Id(id)) {
             throw new RecursoEmUsoException(
                     "Não é possível excluir a imagem, pois ela está vinculada a um departamento.");
         }
+        excluirRegistro(imagem);
+    }
+
+    @Transactional
+    public void excluirOrfa(Imagem imagem) {
+        Integer id = imagem.getId();
+        if (!departamentoRepository.existsByImagem_Id(id) && !noticiaRepository.existsByImagem_Id(id)) {
+            excluirRegistro(imagem);
+        }
+    }
+
+    private void excluirRegistro(Imagem imagem) {
+        imagemConteudoRepository.excluirConteudo(imagem.getId());
         imagemRepository.delete(imagem);
     }
 
-    // Usado quando o departamento dono da imagem acabou de ser excluído.
-    @Transactional
-    public void excluirOrfa(Imagem imagem) {
-        if (!departamentoRepository.existsByImagem_Id(imagem.getId())) {
-            imagemRepository.delete(imagem);
+    private void protegerCapa(Integer id) {
+        if (noticiaRepository.existsByImagem_Id(id)) {
+            throw new RecursoEmUsoException("A imagem está vinculada a uma notícia.");
         }
     }
 
