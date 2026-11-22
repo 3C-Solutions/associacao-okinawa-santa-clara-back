@@ -1,7 +1,6 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.
-        DashboardFinanceiroResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.DashboardFinanceiroResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.FinanceiroDashboardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
