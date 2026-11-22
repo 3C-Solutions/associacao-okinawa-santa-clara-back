@@ -16,6 +16,37 @@ Para validar o cadastro, a substituição, a exclusão e o rollback, configure
 `IMAGEM_INTEGRATION=true` e execute `mvnw.cmd -Dtest=ImagemIntegrationTests test`
 com as variáveis da aplicação apontando para um PostgreSQL de teste descartável.
 
+## Notícias
+
+O Hibernate prepara as tabelas no ambiente local com `ddl-auto: update`.
+Cadastre `GERENCIAR_NOTICIAS` no catálogo de funcionalidades e atribua o código
+às funções responsáveis pela gestão. O público de uma notícia é `TODOS` ou o
+nome de uma função cadastrada, conforme `GET /noticias/publicos`.
+
+```sql
+INSERT INTO public.funcionalidade_sistema (codigo, nome, descricao)
+SELECT 'GERENCIAR_NOTICIAS', 'Gerenciar notícias', 'Cadastrar, editar, publicar e excluir notícias'
+WHERE NOT EXISTS (
+    SELECT 1 FROM public.funcionalidade_sistema WHERE codigo = 'GERENCIAR_NOTICIAS'
+);
+```
+
+- `POST /noticias` e `PUT /noticias/{id}` usam multipart com a parte JSON
+  `dados` (`titulo`, `classificacao`, `conteudo`, `status` e `publico`) e
+  a parte opcional `imagem` (JPEG, PNG ou WebP de até 1 MiB).
+- Na edição, omitir `imagem` preserva a capa. Um novo arquivo a substitui.
+  Envie `removerImagem: true` na parte `dados` para desvincular a capa.
+- A lista aceita `pagina` (base zero), `tamanho`, `busca` e `status`.
+  O detalhe e a rota `GET /noticias/{id}/imagem` exigem autenticação e
+  aplicam a mesma regra de visibilidade da lista.
+- `PATCH /noticias/{id}/status` recebe `RASCUNHO` ou `PUBLICADO` no
+  campo JSON `status`. A gestão exige `GERENCIAR_NOTICIAS` e as alterações
+  por ID respeitam o público da notícia.
+
+Para validar a persistência e a visibilidade das capas, use um PostgreSQL de
+teste descartável e execute `mvnw.cmd -Dtest=NoticiasIntegrationTests test`
+com `NOTICIAS_INTEGRATION=true`.
+
 ## Seleção de famílias no financeiro
 
 As consultas `GET /familias` e `GET /familias/{id}` seguem o contrato do

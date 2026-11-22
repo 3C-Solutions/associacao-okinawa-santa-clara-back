@@ -10,6 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
+    @Query("select f.nome from Usuario u join u.funcaoSistema f where u.id = :id and u.ativo = true")
+    Optional<String> buscarNomeFuncaoAtiva(@Param("id") Integer id);
+
     Boolean existsByEmail(String email);
     boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
 

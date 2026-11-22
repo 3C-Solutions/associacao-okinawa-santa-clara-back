@@ -6,6 +6,7 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Funcao
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.FuncionalidadeSistema;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.AlreadyExistsByNomeException;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.NotExistsByIdException;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.exceptions.RegraNegocioException;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.FuncaoSistemaMapper;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncaoSistemaRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FuncionalidadeSistemaRepository;
@@ -21,6 +22,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+
+import static com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Noticia.TODOS;
 
 @Service
 public class FuncaoSistemaService {
@@ -43,6 +46,9 @@ public class FuncaoSistemaService {
     @Transactional
     public FuncaoSistemaResponse cadastrar(FuncaoSistemaCreateRequest request) {
         FuncaoSistema funcao = FuncaoSistemaMapper.toEntity(request);
+        if (TODOS.equalsIgnoreCase(funcao.getNome())) {
+            throw new RegraNegocioException("O nome Todos é reservado para o público de notícias.");
+        }
         if (funcaoSistemaRepository.existsByNomeNormalizado(funcao.getNome())) {
             throw nomeJaCadastrado();
         }

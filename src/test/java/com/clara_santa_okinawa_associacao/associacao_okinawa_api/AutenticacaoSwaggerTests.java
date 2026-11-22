@@ -6,6 +6,10 @@ import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.OpenApi
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.configs.SecurityConfig;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.AuthController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.MinhaContaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.NoticiaController;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.noticia.NoticiaResponse;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.NoticiaService;
+import org.springframework.mock.web.MockMultipartFile;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.MinhaContaService;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.FamiliaController;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers.EnderecoController;
@@ -86,6 +90,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -112,7 +117,8 @@ class AutenticacaoSwaggerTests {
             UsuarioAutenticadoService.class, AuthService.class, TokenService.class, UsuarioDetailsService.class,
             GlobalExceptionHandler.class, FuncionalidadeSistemaController.class, FuncionalidadeSistemaService.class,
             DespesasController.class, FinanceiroDashboardController.class,
-            FamiliaController.class, EnderecoController.class, MinhaContaController.class, MinhaContaService.class})
+            FamiliaController.class, EnderecoController.class, MinhaContaController.class, MinhaContaService.class,
+            NoticiaController.class})
     static class TestConfig {
     }
 
@@ -143,6 +149,30 @@ class AutenticacaoSwaggerTests {
     private DespesasService despesasService;
     @MockitoBean
     private FinanceiroDashboardService financeiroService;
+    @MockitoBean
+    private NoticiaService noticiaService;
+
+    @Test
+    void noticiasExigemSessaoEGestaoParaCadastrarComMultipart() throws Exception {
+        String token = "Bearer " + tokenService.gerarToken(1, false).accesToken();
+        var dados = new MockMultipartFile("dados", "", "application/json", """
+                {"titulo":"Comunicado","classificacao":"Evento","conteudo":"Texto da notícia",
+                 "status":"PUBLICADO","publico":"TODOS"}
+                """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(noticiaService.listar(eq(1), eq(false), eq(null), eq(""), any()))
+                .thenReturn(new NoticiaResponse.Pagina(List.of(), 0, 20, 0, 0));
+
+        mvc.perform(get("/noticias")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/noticias").header("Authorization", token))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.itens").isEmpty());
+        mvc.perform(multipart("/noticias").file(dados).header("Authorization", token))
+                .andExpect(status().isForbidden());
+
+        adicionarPermissao(usuario, "GERENCIAR_NOTICIAS");
+        when(noticiaService.cadastrar(any(), eq(null))).thenReturn(42);
+        mvc.perform(multipart("/noticias").file(dados).header("Authorization", token))
+                .andExpect(status().isCreated()).andExpect(header().string("Location", "noticias/42"));
+    }
 
     @Test
     void financeiroExigeAutenticacaoEPermissao() throws Exception {
