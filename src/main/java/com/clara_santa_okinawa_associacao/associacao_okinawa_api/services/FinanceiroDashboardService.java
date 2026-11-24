@@ -55,13 +55,13 @@ public class FinanceiroDashboardService {
             itens.add(new LancamentoFinanceiroResponse("ENT-" + e.getId(), e.getData(),
                     e.getDescricao(), e.getCategoria(), "ENTRADA", FinanceiroRegras.valor(e.getValor()),
                     "Recebido".equals(e.getStatus()) ? "Confirmado" : "Pendente", false,
-                    e.getFkUsuario(), e.getFkFamilia(), false));
+                    e.getFkUsuario(), e.getFkFamilia()));
         }
         for (Despesas d : despesas.findAll()) {
             if (d.getDtDepesa() == null) continue;
             itens.add(new LancamentoFinanceiroResponse("DES-" + d.getIdDespesas(), d.getDtDepesa(),
                     d.getDescricao(), d.getCategoria(), "SAIDA", FinanceiroRegras.valor(d.getValor()),
-                    d.getStatus(), false, d.getFkUsuario(), d.getFkFamilia(), d.getFkReembolso() != null));
+                    d.getStatus(), false, d.getFkUsuario(), d.getFkFamilia()));
         }
         for (Pagamento p : pagamentos.findAll()) {
             if (p.getDtPagamento() == null) continue; // pendentes aparecem na rota /pagamentos
@@ -70,7 +70,7 @@ public class FinanceiroDashboardService {
                     "Pagamento sem Anuidade valida: " + p.getIdPagamento());
             itens.add(new LancamentoFinanceiroResponse("PAG-" + p.getIdPagamento(), p.getDtPagamento(),
                     "Anuidade - Familia " + p.getFkFamilia(), "Anuidades", "ENTRADA", valor,
-                    p.getStatus(), true, null, p.getFkFamilia(), false));
+                    p.getStatus(), true, null, p.getFkFamilia()));
         }
         for (PagamentoDepartamento p : pagamentosDepartamento.findAll()) {
             if (p.getDtPagamento() == null) continue;
@@ -80,7 +80,7 @@ public class FinanceiroDashboardService {
             itens.add(new LancamentoFinanceiroResponse("PDE-" + p.getIdPagamentoDepartamento(), p.
                     getDtPagamento(),
                     "Mensalidade - Departamento " + p.getFkDepartamento(), "Mensalidades", "ENTRADA",
-                    valor, p.getStatus(), true, null, null, false));
+                    valor, p.getStatus(), true, null, null));
         }
         itens.sort(Comparator.comparing(LancamentoFinanceiroResponse::data).reversed()
                 .thenComparing(LancamentoFinanceiroResponse::id));

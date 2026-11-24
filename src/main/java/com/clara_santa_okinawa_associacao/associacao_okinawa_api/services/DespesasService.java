@@ -2,10 +2,8 @@ package com.clara_santa_okinawa_associacao.associacao_okinawa_api.services;
 
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.*;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Despesas;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.SolicitacaoReembolso;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.DespesasRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.FamiliaRepository;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.SolicitacaoReembolsoRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.mappers.DespesasMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -16,12 +14,9 @@ import java.util.List;
 public class DespesasService {
     private final DespesasRepository repository;
     private final FamiliaRepository familias;
-    private final SolicitacaoReembolsoRepository reembolsos;
-    public DespesasService(DespesasRepository repository, FamiliaRepository familias,
-                           SolicitacaoReembolsoRepository reembolsos) {
+    public DespesasService(DespesasRepository repository, FamiliaRepository familias) {
         this.repository = repository;
         this.familias = familias;
-        this.reembolsos = reembolsos;
     }
     private void validar(String descricao, Integer familiaId) {
         if (descricao.trim().length() < 3) {
@@ -48,7 +43,6 @@ public class DespesasService {
     @Transactional
     public DespesasResponse editar(Integer id, DespesasUpdateRequest r) {
         Despesas d = buscar(id);
-        validarDespesaEditavel(d);
         validar(r.descricao(), r.fkFamilia());
         DespesasMapper.updateEntity(r, d);
         return DespesasMapper.toResponse(repository.save(d));
@@ -58,28 +52,9 @@ public class DespesasService {
         Despesas d = buscar(id);
         if (!"Pendente".equalsIgnoreCase(d.getStatus())) throw new ResponseStatusException(
                 HttpStatus.CONFLICT, "Somente despesa pendente pode ser confirmada");
-        SolicitacaoReembolso reembolso = null;
-        if (d.getFkReembolso() != null) {
-            reembolso = reembolsos.buscarParaAtualizacao(d.getFkReembolso()).orElseThrow(() ->
-                    new ResponseStatusException(HttpStatus.CONFLICT, "Solicitação de reembolso não encontrada"));
-            if (!"Aprovado".equals(reembolso.getStatus())) throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Somente reembolso aprovado pode ser pago");
-            reembolso.setStatus("Pago");
-        }
         d.setStatus("Pago");
-        DespesasResponse resposta = DespesasMapper.toResponse(repository.save(d));
-        if (reembolso != null) reembolsos.save(reembolso);
-        return resposta;
+        return DespesasMapper.toResponse(repository.save(d));
     }
     @Transactional
-    public void excluir(Integer id) {
-        Despesas d = buscar(id);
-        validarDespesaEditavel(d);
-        repository.delete(d);
-    }
-
-    private void validarDespesaEditavel(Despesas despesa) {
-        if (despesa.getFkReembolso() != null) throw new ResponseStatusException(
-                HttpStatus.CONFLICT, "Despesa vinculada a reembolso não pode ser editada ou excluída");
-    }
+    public void excluir(Integer id) { repository.delete(buscar(id)); }
 }

@@ -6,5 +6,5 @@ import java.time.LocalDate;
 public record LancamentoFinanceiroResponse(
         String id, LocalDate data, String descricao, String categoria,
         String tipo, BigDecimal valor, String status, boolean bloqueado,
-        Integer fkUsuario, Integer fkFamilia, boolean reembolso
+        Integer fkUsuario, Integer fkFamilia
 ) {}
