@@ -332,6 +332,31 @@ Testes sem PostgreSQL ou envio de e-mail (JDK 21):
 O teste genérico `contextLoads` continua dependendo da configuração real de banco,
 JWT e e-mail. Os testes financeiros e de autenticação usam repositórios simulados.
 
+## Solicitações de reembolso
+
+Execute `database/migrations/20261127_reembolso_lancamento.sql` antes de usar este
+fluxo em ambientes que não aplicam o `ddl-auto: update`. Cada pedido é salvo na
+tabela existente `lancamento`, com `tipo_lancamento = 'REEMBOLSO'`; motivo,
+valor, status, data e solicitante usam as colunas existentes. O solicitante é
+obtido do JWT. `GET /reembolsos/meus` lista somente os pedidos da conta autenticada.
+
+O Financeiro, com `TELA_FINANCEIRO`, consulta `GET /reembolsos`, aprova com
+`PATCH /reembolsos/{id}/aprovar` ou recusa com `PATCH /reembolsos/{id}/recusar`.
+A aprovação cria uma despesa vinculada ao ID do lançamento com status `Pendente`,
+visível nos lançamentos financeiros. Ao confirmar essa despesa, o lançamento do
+reembolso passa a `Pago`; a recusa não cria despesa. Uma solicitação só pode ser
+analisada uma vez. O esquema atual não armazena comprovante nem motivo de recusa.
+
+Se a tabela legada `solicitacao_reembolso` já existir e contiver registros, a
+migração interrompe a execução para evitar perder esses pedidos; eles precisam
+ser tratados antes da troca. A tabela legada não é removida.
+
+Testes sem PostgreSQL:
+
+```powershell
+.\mvnw.cmd '-Dtest=SolicitacaoReembolsoServiceTests,FinanceiroTests' test
+```
+
 ## Configurações da própria conta
 
 Os endpoints abaixo exigem apenas autenticação válida, sem permissão administrativa.

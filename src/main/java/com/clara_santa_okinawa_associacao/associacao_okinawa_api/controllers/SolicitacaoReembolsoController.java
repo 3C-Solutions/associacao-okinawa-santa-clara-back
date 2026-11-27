@@ -1,6 +1,5 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.controllers;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.ReembolsoRecusarRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.SolicitacaoReembolsoCreateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.SolicitacaoReembolsoResponse;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.SolicitacaoReembolsoService;
@@ -51,10 +50,7 @@ public class SolicitacaoReembolsoController {
 
     @PatchMapping("/{id}/recusar")
     @PreAuthorize("hasAuthority('TELA_FINANCEIRO')")
-    public SolicitacaoReembolsoResponse recusar(@PathVariable Integer id,
-                                                @Valid @RequestBody ReembolsoRecusarRequest request,
-                                                JwtAuthenticationToken authentication) {
-        Integer revisorId = Integer.valueOf(authentication.getToken().getSubject());
-        return service.recusar(id, revisorId, request.motivo());
+    public SolicitacaoReembolsoResponse recusar(@PathVariable Integer id) {
+        return service.recusar(id);
     }
 }

@@ -23,7 +23,7 @@ class FinanceiroTests {
     private final AnuidadeRepository anuidades = mock(AnuidadeRepository.class);
     private final MensalidadeRepository mensalidades = mock(MensalidadeRepository.class);
     private final FamiliaRepository familias = mock(FamiliaRepository.class);
-    private final SolicitacaoReembolsoRepository reembolsos = mock(SolicitacaoReembolsoRepository.class);
+    private final LancamentoRepository lancamentos = mock(LancamentoRepository.class);
     private final EntradaFinanceiraRepository entradas = mock(EntradaFinanceiraRepository.class);
     private final FinanceiroDashboardService dashboard = new FinanceiroDashboardService(
             despesas, pagamentos, departamentos, anuidades, mensalidades, entradas);
@@ -101,7 +101,7 @@ class FinanceiroTests {
 
     @Test
     void criacaoUsaResponsavelAutenticadoEEdicaoPreservaResponsavel() {
-        var service = new DespesasService(despesas, familias, reembolsos);
+        var service = new DespesasService(despesas, familias, lancamentos);
         when(despesas.save(any())).thenAnswer(invocacao -> invocacao.getArgument(0));
         var criado = service.criar(new DespesasCreateRequest(LocalDate.of(2026, 11, 3), " Materiais ", " Outros ", new BigDecimal("12.50"), "pago", 999, null), 7);
         assertEquals(7, criado.fkUsuario());
@@ -114,7 +114,7 @@ class FinanceiroTests {
 
     @Test
     void naoGravaFamiliaInexistenteNemConfirmaDespesaRecusada() {
-        var service = new DespesasService(despesas, familias, reembolsos);
+        var service = new DespesasService(despesas, familias, lancamentos);
         assertEquals(HttpStatus.NOT_FOUND, assertThrows(ResponseStatusException.class, () -> service.criar(new DespesasCreateRequest(LocalDate.now(), "Materiais", "Outros", BigDecimal.ONE, "Pago", null, 999), 7)).getStatusCode());
         when(despesas.findById(1)).thenReturn(Optional.of(despesa(1, "2026-11-03", "10", "Recusado")));
         assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class, () -> service.confirmar(1)).getStatusCode());
@@ -123,21 +123,23 @@ class FinanceiroTests {
 
     @Test
     void pagarDespesaDeReembolsoAtualizaSolicitacaoEImpedeEdicaoOuExclusao() {
-        var service = new DespesasService(despesas, familias, reembolsos);
+        var service = new DespesasService(despesas, familias, lancamentos);
         var despesa = despesa(1, "2026-11-03", "10", "Pendente");
         despesa.setFkReembolso(12);
-        var reembolso = new SolicitacaoReembolso();
+        var reembolso = new Lancamento();
         reembolso.setId(12);
         reembolso.setStatus("Aprovado");
         when(despesas.findById(1)).thenReturn(Optional.of(despesa));
-        when(reembolsos.buscarParaAtualizacao(12)).thenReturn(Optional.of(reembolso));
+        when(lancamentos.buscarParaAtualizacao(12, Lancamento.TIPO_REEMBOLSO))
+                .thenReturn(Optional.of(reembolso));
         when(despesas.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
-        when(reembolsos.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(lancamentos.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         service.confirmar(1);
 
         assertEquals("Pago", despesa.getStatus());
         assertEquals("Pago", reembolso.getStatus());
+        verify(lancamentos).save(reembolso);
         assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,
                 () -> service.editar(1, new DespesasUpdateRequest(LocalDate.now(), "Reembolso", "Reembolsos", BigDecimal.TEN, "Pendente", null, null))).getStatusCode());
         assertEquals(HttpStatus.CONFLICT, assertThrows(ResponseStatusException.class,

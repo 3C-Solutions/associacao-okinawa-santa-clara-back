@@ -1,7 +1,7 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 public record SolicitacaoReembolsoResponse(
         Integer id,
@@ -10,8 +10,5 @@ public record SolicitacaoReembolsoResponse(
         String motivo,
         BigDecimal valor,
         String status,
-        LocalDateTime dataSolicitacao,
-        LocalDateTime dataRevisao,
-        String motivoRecusa,
-        ComprovanteReembolsoResponse comprovante
+        LocalDate dataSolicitacao
 ) {}

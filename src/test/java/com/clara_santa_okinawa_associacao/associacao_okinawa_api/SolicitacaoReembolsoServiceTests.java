@@ -1,30 +1,29 @@
 package com.clara_santa_okinawa_associacao.associacao_okinawa_api;
 
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.ComprovanteReembolsoRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.dtos.financeiro.SolicitacaoReembolsoCreateRequest;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Despesas;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.SolicitacaoReembolso;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Lancamento;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.entities.Usuario;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.DespesasRepository;
-import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.SolicitacaoReembolsoRepository;
+import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.LancamentoRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.repositories.UsuarioRepository;
 import com.clara_santa_okinawa_associacao.associacao_okinawa_api.services.SolicitacaoReembolsoService;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class SolicitacaoReembolsoServiceTests {
-    private final SolicitacaoReembolsoRepository solicitacoes = mock(SolicitacaoReembolsoRepository.class);
+    private final LancamentoRepository lancamentos = mock(LancamentoRepository.class);
     private final DespesasRepository despesas = mock(DespesasRepository.class);
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final SolicitacaoReembolsoService service =
-            new SolicitacaoReembolsoService(solicitacoes, despesas, usuarios);
+            new SolicitacaoReembolsoService(lancamentos, despesas, usuarios);
 
     private Usuario usuario() {
         Usuario usuario = new Usuario();
@@ -33,41 +32,49 @@ class SolicitacaoReembolsoServiceTests {
         return usuario;
     }
 
-    private SolicitacaoReembolso solicitacao(String status) {
-        SolicitacaoReembolso solicitacao = new SolicitacaoReembolso();
-        solicitacao.setId(12);
-        solicitacao.setSolicitante(usuario());
-        solicitacao.setMotivo("Compra de materiais");
-        solicitacao.setValor(new BigDecimal("45.50"));
-        solicitacao.setComprovanteNome("nota.png");
-        solicitacao.setComprovanteTipo("image/png");
-        solicitacao.setComprovanteDados("data:image/png;base64,aGVsbG8=");
-        solicitacao.setStatus(status);
-        solicitacao.setDataSolicitacao(LocalDateTime.now());
-        return solicitacao;
+    private Lancamento reembolso(String status) {
+        var lancamento = new Lancamento();
+        lancamento.setId(12);
+        lancamento.setUsuario(usuario());
+        lancamento.setDescricao("Compra de materiais");
+        lancamento.setCategoria("Reembolsos");
+        lancamento.setValor(new BigDecimal("45.50"));
+        lancamento.setStatus(status);
+        lancamento.setTipoLancamento(Lancamento.TIPO_REEMBOLSO);
+        lancamento.setDataLancamento(LocalDate.of(2026, 11, 16));
+        return lancamento;
     }
 
     @Test
-    void criaSolicitacaoComUsuarioAutenticadoEComprovanteValidado() {
+    void criaSolicitacaoComoLancamentoUsandoUsuarioAutenticado() {
         when(usuarios.findById(7)).thenReturn(Optional.of(usuario()));
-        when(solicitacoes.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+        when(lancamentos.save(any())).thenAnswer(chamada -> {
+            Lancamento salvo = chamada.getArgument(0);
+            salvo.setId(12);
+            return salvo;
+        });
         var pedido = new SolicitacaoReembolsoCreateRequest(
-                " Compra de materiais ", new BigDecimal("45.50"),
-                new ComprovanteReembolsoRequest(" nota.png ", "image/png", "data:image/png;base64,aGVsbG8="));
+                " Compra de materiais ", new BigDecimal("45.50"));
 
         var resposta = service.criar(pedido, 7);
 
+        assertEquals(12, resposta.id());
         assertEquals("Pendente", resposta.status());
         assertEquals("Ana", resposta.solicitante());
         assertEquals("Compra de materiais", resposta.motivo());
-        assertEquals("nota.png", resposta.comprovante().nome());
-        verify(solicitacoes).save(any(SolicitacaoReembolso.class));
+        var captor = org.mockito.ArgumentCaptor.forClass(Lancamento.class);
+        verify(lancamentos).save(captor.capture());
+        assertEquals(Lancamento.TIPO_REEMBOLSO, captor.getValue().getTipoLancamento());
+        assertEquals(7, captor.getValue().getUsuario().getId());
+        assertEquals("Reembolsos", captor.getValue().getCategoria());
+        verifyNoInteractions(despesas);
     }
 
     @Test
-    void aprovacaoCriaDespesaPendenteVinculadaUmaUnicaVez() {
-        when(solicitacoes.buscarParaAtualizacao(12)).thenReturn(Optional.of(solicitacao("Pendente")));
-        when(solicitacoes.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+    void aprovacaoCriaDespesaPendenteVinculadaAoLancamento() {
+        when(lancamentos.buscarParaAtualizacao(12, Lancamento.TIPO_REEMBOLSO))
+                .thenReturn(Optional.of(reembolso("Pendente")));
+        when(lancamentos.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
         when(despesas.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
         var resposta = service.aprovar(12, 3);
@@ -84,7 +91,8 @@ class SolicitacaoReembolsoServiceTests {
 
     @Test
     void naoPermiteRevisarDuasVezes() {
-        when(solicitacoes.buscarParaAtualizacao(12)).thenReturn(Optional.of(solicitacao("Aprovado")));
+        when(lancamentos.buscarParaAtualizacao(12, Lancamento.TIPO_REEMBOLSO))
+                .thenReturn(Optional.of(reembolso("Aprovado")));
 
         var falha = assertThrows(ResponseStatusException.class, () -> service.aprovar(12, 3));
 
@@ -93,26 +101,26 @@ class SolicitacaoReembolsoServiceTests {
     }
 
     @Test
-    void recusaExigePedidoPendenteERegistraMotivo() {
-        when(solicitacoes.buscarParaAtualizacao(12)).thenReturn(Optional.of(solicitacao("Pendente")));
-        when(solicitacoes.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
+    void recusaSolicitacaoPendenteSemCapturarMotivoIndisponivelNoEsquema() {
+        when(lancamentos.buscarParaAtualizacao(12, Lancamento.TIPO_REEMBOLSO))
+                .thenReturn(Optional.of(reembolso("Pendente")));
+        when(lancamentos.save(any())).thenAnswer(chamada -> chamada.getArgument(0));
 
-        var resposta = service.recusar(12, 3, "  Sem comprovante válido  ");
+        var resposta = service.recusar(12);
 
         assertEquals("Recusado", resposta.status());
-        assertEquals("Sem comprovante válido", resposta.motivoRecusa());
+        verify(lancamentos).save(any(Lancamento.class));
         verifyNoInteractions(despesas);
     }
 
     @Test
-    void rejeitaComprovanteInválidoAntesDePersistir() {
-        var pedido = new SolicitacaoReembolsoCreateRequest(
-                "Compra de materiais", BigDecimal.ONE,
-                new ComprovanteReembolsoRequest("nota.png", "image/png", "data:image/jpeg;base64,aGVsbG8="));
+    void naoCriaLancamentoSemUsuarioAutenticado() {
+        when(usuarios.findById(7)).thenReturn(Optional.empty());
+        var pedido = new SolicitacaoReembolsoCreateRequest("Compra de materiais", BigDecimal.ONE);
 
         var falha = assertThrows(ResponseStatusException.class, () -> service.criar(pedido, 7));
 
-        assertEquals(HttpStatus.BAD_REQUEST, falha.getStatusCode());
-        verifyNoInteractions(usuarios, solicitacoes);
+        assertEquals(HttpStatus.UNAUTHORIZED, falha.getStatusCode());
+        verifyNoInteractions(lancamentos, despesas);
     }
 }
