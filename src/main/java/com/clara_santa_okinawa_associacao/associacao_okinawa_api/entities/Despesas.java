@@ -24,6 +24,8 @@ public class Despesas {
     private Integer fkUsuario;
     @Column(name = "fk_familia")
     private Integer fkFamilia;
+    @Column(name = "fk_reembolso")
+    private Integer fkReembolso;
     public Integer getIdDespesas() { return idDespesas; }
     public void setIdDespesas(Integer value) { this.idDespesas = value; }
     public LocalDate getDtDepesa() { return dtDepesa; }
@@ -40,4 +42,6 @@ public class Despesas {
     public void setFkUsuario(Integer value) { this.fkUsuario = value; }
     public Integer getFkFamilia() { return fkFamilia; }
     public void setFkFamilia(Integer value) { this.fkFamilia = value; }
+    public Integer getFkReembolso() { return fkReembolso; }
+    public void setFkReembolso(Integer value) { this.fkReembolso = value; }
 }
